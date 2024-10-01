@@ -6,7 +6,7 @@ import {
   bootstrapApplication,
   provideProtractorTestingSupport,
 } from '@angular/platform-browser'
-import { AppLogicComponent } from './app/app-logic-component/app-logic-component'
+import { AppLogicComponent } from './src/app/app-logic-component/app-logic-component'
 
 bootstrapApplication(AppLogicComponent, {
   providers: [provideProtractorTestingSupport()],
