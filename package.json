@@ -1,7 +1,6 @@
 {
   "name": "angular.dev",
   "version": "0.0.0",
-  "homepage": "https://louisebohlin.github.io/angular-countdown",
   "scripts": {
     "ng": "ng",
     "start": "NG_BUILD_PARALLEL_TS=0 ng serve",
