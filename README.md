@@ -22,10 +22,10 @@ Steps to install and set up the project locally:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/your-project-name.git
+git clone https://github.com/louisebohlin/angular-countdown.git
 
 # Navigate to the project directory
-cd your-project-name
+cd angular-countdown
 
 # Install dependencies
 npm install
@@ -38,3 +38,4 @@ npm start
 
 # Run Prettier
 npm run format
+```
