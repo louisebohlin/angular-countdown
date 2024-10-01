@@ -8,7 +8,7 @@ import {
   isPlatformServer,
   parseCookieValue,
   setRootDomAdapter
-} from "./chunk-ASWGWBBK.js";
+} from "./chunk-FIWEHJBL.js";
 import {
   APP_BOOTSTRAP_LISTENER,
   APP_ID,
@@ -44,6 +44,7 @@ import {
   Version,
   ViewEncapsulation$1,
   XSS_SECURITY_URL,
+  ZONELESS_ENABLED,
   __async,
   __objRest,
   __spreadProps,
@@ -87,7 +88,7 @@ import {
   ɵɵdefineInjector,
   ɵɵdefineNgModule,
   ɵɵinject
-} from "./chunk-74SHBESK.js";
+} from "./chunk-X7WBHT7Z.js";
 
 // node_modules/@angular/common/fesm2022/http.mjs
 var HttpHandler = class {
@@ -930,7 +931,7 @@ function addBody(options, body) {
     transferCache: options.transferCache
   };
 }
-var _HttpClient = class _HttpClient {
+var HttpClient = class _HttpClient {
   constructor(handler) {
     this.handler = handler;
   }
@@ -1122,15 +1123,18 @@ var _HttpClient = class _HttpClient {
   put(url, body, options = {}) {
     return this.request("PUT", url, addBody(options, body));
   }
+  static {
+    this.ɵfac = function HttpClient_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HttpClient)(ɵɵinject(HttpHandler));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _HttpClient,
+      factory: _HttpClient.ɵfac
+    });
+  }
 };
-_HttpClient.ɵfac = function HttpClient_Factory(t) {
-  return new (t || _HttpClient)(ɵɵinject(HttpHandler));
-};
-_HttpClient.ɵprov = ɵɵdefineInjectable({
-  token: _HttpClient,
-  factory: _HttpClient.ɵfac
-});
-var HttpClient = _HttpClient;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpClient, [{
     type: Injectable
@@ -1147,11 +1151,11 @@ function getResponseUrl$1(response) {
   const xRequestUrl = REQUEST_URL_HEADER.toLocaleLowerCase();
   return response.headers.get(xRequestUrl);
 }
-var _FetchBackend = class _FetchBackend {
+var FetchBackend = class _FetchBackend {
   constructor() {
     this.fetchImpl = inject(FetchFactory, {
       optional: true
-    })?.fetch ?? fetch.bind(globalThis);
+    })?.fetch ?? ((...args) => globalThis.fetch(...args));
     this.ngZone = inject(NgZone);
   }
   handle(request) {
@@ -1315,15 +1319,18 @@ var _FetchBackend = class _FetchBackend {
     }
     return chunksAll;
   }
+  static {
+    this.ɵfac = function FetchBackend_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _FetchBackend)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _FetchBackend,
+      factory: _FetchBackend.ɵfac
+    });
+  }
 };
-_FetchBackend.ɵfac = function FetchBackend_Factory(t) {
-  return new (t || _FetchBackend)();
-};
-_FetchBackend.ɵprov = ɵɵdefineInjectable({
-  token: _FetchBackend,
-  factory: _FetchBackend.ɵfac
-});
-var FetchBackend = _FetchBackend;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(FetchBackend, [{
     type: Injectable
@@ -1374,7 +1381,7 @@ function legacyInterceptorFnFactory() {
   };
 }
 var fetchBackendWarningDisplayed = false;
-var _HttpInterceptorHandler = class _HttpInterceptorHandler extends HttpHandler {
+var HttpInterceptorHandler = class _HttpInterceptorHandler extends HttpHandler {
   constructor(backend, injector) {
     super();
     this.backend = backend;
@@ -1402,15 +1409,18 @@ var _HttpInterceptorHandler = class _HttpInterceptorHandler extends HttpHandler 
       return this.chain(initialRequest, (downstreamRequest) => this.backend.handle(downstreamRequest));
     }
   }
+  static {
+    this.ɵfac = function HttpInterceptorHandler_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HttpInterceptorHandler)(ɵɵinject(HttpBackend), ɵɵinject(EnvironmentInjector));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _HttpInterceptorHandler,
+      factory: _HttpInterceptorHandler.ɵfac
+    });
+  }
 };
-_HttpInterceptorHandler.ɵfac = function HttpInterceptorHandler_Factory(t) {
-  return new (t || _HttpInterceptorHandler)(ɵɵinject(HttpBackend), ɵɵinject(EnvironmentInjector));
-};
-_HttpInterceptorHandler.ɵprov = ɵɵdefineInjectable({
-  token: _HttpInterceptorHandler,
-  factory: _HttpInterceptorHandler.ɵfac
-});
-var HttpInterceptorHandler = _HttpInterceptorHandler;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpInterceptorHandler, [{
     type: Injectable
@@ -1434,7 +1444,7 @@ function jsonpCallbackContext() {
   }
   return {};
 }
-var _JsonpClientBackend = class _JsonpClientBackend {
+var JsonpClientBackend = class _JsonpClientBackend {
   constructor(callbackMap, document2) {
     this.callbackMap = callbackMap;
     this.document = document2;
@@ -1474,9 +1484,7 @@ var _JsonpClientBackend = class _JsonpClientBackend {
         finished = true;
       };
       const cleanup = () => {
-        if (node.parentNode) {
-          node.parentNode.removeChild(node);
-        }
+        node.remove();
         delete this.callbackMap[callback];
       };
       const onLoad = (event) => {
@@ -1527,15 +1535,18 @@ var _JsonpClientBackend = class _JsonpClientBackend {
     foreignDocument ??= this.document.implementation.createHTMLDocument();
     foreignDocument.adoptNode(script);
   }
+  static {
+    this.ɵfac = function JsonpClientBackend_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _JsonpClientBackend)(ɵɵinject(JsonpCallbackContext), ɵɵinject(DOCUMENT));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _JsonpClientBackend,
+      factory: _JsonpClientBackend.ɵfac
+    });
+  }
 };
-_JsonpClientBackend.ɵfac = function JsonpClientBackend_Factory(t) {
-  return new (t || _JsonpClientBackend)(ɵɵinject(JsonpCallbackContext), ɵɵinject(DOCUMENT));
-};
-_JsonpClientBackend.ɵprov = ɵɵdefineInjectable({
-  token: _JsonpClientBackend,
-  factory: _JsonpClientBackend.ɵfac
-});
-var JsonpClientBackend = _JsonpClientBackend;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(JsonpClientBackend, [{
     type: Injectable
@@ -1555,7 +1566,7 @@ function jsonpInterceptorFn(req, next) {
   }
   return next(req);
 }
-var _JsonpInterceptor = class _JsonpInterceptor {
+var JsonpInterceptor = class _JsonpInterceptor {
   constructor(injector) {
     this.injector = injector;
   }
@@ -1569,15 +1580,18 @@ var _JsonpInterceptor = class _JsonpInterceptor {
   intercept(initialRequest, next) {
     return runInInjectionContext(this.injector, () => jsonpInterceptorFn(initialRequest, (downstreamRequest) => next.handle(downstreamRequest)));
   }
+  static {
+    this.ɵfac = function JsonpInterceptor_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _JsonpInterceptor)(ɵɵinject(EnvironmentInjector));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _JsonpInterceptor,
+      factory: _JsonpInterceptor.ɵfac
+    });
+  }
 };
-_JsonpInterceptor.ɵfac = function JsonpInterceptor_Factory(t) {
-  return new (t || _JsonpInterceptor)(ɵɵinject(EnvironmentInjector));
-};
-_JsonpInterceptor.ɵprov = ɵɵdefineInjectable({
-  token: _JsonpInterceptor,
-  factory: _JsonpInterceptor.ɵfac
-});
-var JsonpInterceptor = _JsonpInterceptor;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(JsonpInterceptor, [{
     type: Injectable
@@ -1595,7 +1609,7 @@ function getResponseUrl(xhr) {
   }
   return null;
 }
-var _HttpXhrBackend = class _HttpXhrBackend {
+var HttpXhrBackend = class _HttpXhrBackend {
   constructor(xhrFactory) {
     this.xhrFactory = xhrFactory;
   }
@@ -1771,15 +1785,18 @@ var _HttpXhrBackend = class _HttpXhrBackend {
       });
     }));
   }
+  static {
+    this.ɵfac = function HttpXhrBackend_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HttpXhrBackend)(ɵɵinject(XhrFactory));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _HttpXhrBackend,
+      factory: _HttpXhrBackend.ɵfac
+    });
+  }
 };
-_HttpXhrBackend.ɵfac = function HttpXhrBackend_Factory(t) {
-  return new (t || _HttpXhrBackend)(ɵɵinject(XhrFactory));
-};
-_HttpXhrBackend.ɵprov = ɵɵdefineInjectable({
-  token: _HttpXhrBackend,
-  factory: _HttpXhrBackend.ɵfac
-});
-var HttpXhrBackend = _HttpXhrBackend;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpXhrBackend, [{
     type: Injectable
@@ -1800,7 +1817,7 @@ var XSRF_HEADER_NAME = new InjectionToken(ngDevMode ? "XSRF_HEADER_NAME" : "", {
 });
 var HttpXsrfTokenExtractor = class {
 };
-var _HttpXsrfCookieExtractor = class _HttpXsrfCookieExtractor {
+var HttpXsrfCookieExtractor = class _HttpXsrfCookieExtractor {
   constructor(doc, platform, cookieName) {
     this.doc = doc;
     this.platform = platform;
@@ -1821,15 +1838,18 @@ var _HttpXsrfCookieExtractor = class _HttpXsrfCookieExtractor {
     }
     return this.lastToken;
   }
+  static {
+    this.ɵfac = function HttpXsrfCookieExtractor_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HttpXsrfCookieExtractor)(ɵɵinject(DOCUMENT), ɵɵinject(PLATFORM_ID), ɵɵinject(XSRF_COOKIE_NAME));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _HttpXsrfCookieExtractor,
+      factory: _HttpXsrfCookieExtractor.ɵfac
+    });
+  }
 };
-_HttpXsrfCookieExtractor.ɵfac = function HttpXsrfCookieExtractor_Factory(t) {
-  return new (t || _HttpXsrfCookieExtractor)(ɵɵinject(DOCUMENT), ɵɵinject(PLATFORM_ID), ɵɵinject(XSRF_COOKIE_NAME));
-};
-_HttpXsrfCookieExtractor.ɵprov = ɵɵdefineInjectable({
-  token: _HttpXsrfCookieExtractor,
-  factory: _HttpXsrfCookieExtractor.ɵfac
-});
-var HttpXsrfCookieExtractor = _HttpXsrfCookieExtractor;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpXsrfCookieExtractor, [{
     type: Injectable
@@ -1867,22 +1887,25 @@ function xsrfInterceptorFn(req, next) {
   }
   return next(req);
 }
-var _HttpXsrfInterceptor = class _HttpXsrfInterceptor {
+var HttpXsrfInterceptor = class _HttpXsrfInterceptor {
   constructor(injector) {
     this.injector = injector;
   }
   intercept(initialRequest, next) {
     return runInInjectionContext(this.injector, () => xsrfInterceptorFn(initialRequest, (downstreamRequest) => next.handle(downstreamRequest)));
   }
+  static {
+    this.ɵfac = function HttpXsrfInterceptor_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HttpXsrfInterceptor)(ɵɵinject(EnvironmentInjector));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _HttpXsrfInterceptor,
+      factory: _HttpXsrfInterceptor.ɵfac
+    });
+  }
 };
-_HttpXsrfInterceptor.ɵfac = function HttpXsrfInterceptor_Factory(t) {
-  return new (t || _HttpXsrfInterceptor)(ɵɵinject(EnvironmentInjector));
-};
-_HttpXsrfInterceptor.ɵprov = ɵɵdefineInjectable({
-  token: _HttpXsrfInterceptor,
-  factory: _HttpXsrfInterceptor.ɵfac
-});
-var HttpXsrfInterceptor = _HttpXsrfInterceptor;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpXsrfInterceptor, [{
     type: Injectable
@@ -1985,7 +2008,7 @@ function withJsonpSupport() {
     multi: true
   }]);
 }
-var _HttpClientXsrfModule = class _HttpClientXsrfModule {
+var HttpClientXsrfModule = class _HttpClientXsrfModule {
   /**
    * Disable the default XSRF protection.
    */
@@ -2009,30 +2032,35 @@ var _HttpClientXsrfModule = class _HttpClientXsrfModule {
       providers: withXsrfConfiguration(options).ɵproviders
     };
   }
+  static {
+    this.ɵfac = function HttpClientXsrfModule_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HttpClientXsrfModule)();
+    };
+  }
+  static {
+    this.ɵmod = ɵɵdefineNgModule({
+      type: _HttpClientXsrfModule
+    });
+  }
+  static {
+    this.ɵinj = ɵɵdefineInjector({
+      providers: [HttpXsrfInterceptor, {
+        provide: HTTP_INTERCEPTORS,
+        useExisting: HttpXsrfInterceptor,
+        multi: true
+      }, {
+        provide: HttpXsrfTokenExtractor,
+        useClass: HttpXsrfCookieExtractor
+      }, withXsrfConfiguration({
+        cookieName: XSRF_DEFAULT_COOKIE_NAME,
+        headerName: XSRF_DEFAULT_HEADER_NAME
+      }).ɵproviders, {
+        provide: XSRF_ENABLED,
+        useValue: true
+      }]
+    });
+  }
 };
-_HttpClientXsrfModule.ɵfac = function HttpClientXsrfModule_Factory(t) {
-  return new (t || _HttpClientXsrfModule)();
-};
-_HttpClientXsrfModule.ɵmod = ɵɵdefineNgModule({
-  type: _HttpClientXsrfModule
-});
-_HttpClientXsrfModule.ɵinj = ɵɵdefineInjector({
-  providers: [HttpXsrfInterceptor, {
-    provide: HTTP_INTERCEPTORS,
-    useExisting: HttpXsrfInterceptor,
-    multi: true
-  }, {
-    provide: HttpXsrfTokenExtractor,
-    useClass: HttpXsrfCookieExtractor
-  }, withXsrfConfiguration({
-    cookieName: XSRF_DEFAULT_COOKIE_NAME,
-    headerName: XSRF_DEFAULT_HEADER_NAME
-  }).ɵproviders, {
-    provide: XSRF_ENABLED,
-    useValue: true
-  }]
-});
-var HttpClientXsrfModule = _HttpClientXsrfModule;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpClientXsrfModule, [{
     type: NgModule,
@@ -2054,18 +2082,23 @@ var HttpClientXsrfModule = _HttpClientXsrfModule;
     }]
   }], null, null);
 })();
-var _HttpClientModule = class _HttpClientModule {
+var HttpClientModule = class _HttpClientModule {
+  static {
+    this.ɵfac = function HttpClientModule_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HttpClientModule)();
+    };
+  }
+  static {
+    this.ɵmod = ɵɵdefineNgModule({
+      type: _HttpClientModule
+    });
+  }
+  static {
+    this.ɵinj = ɵɵdefineInjector({
+      providers: [provideHttpClient(withInterceptorsFromDi())]
+    });
+  }
 };
-_HttpClientModule.ɵfac = function HttpClientModule_Factory(t) {
-  return new (t || _HttpClientModule)();
-};
-_HttpClientModule.ɵmod = ɵɵdefineNgModule({
-  type: _HttpClientModule
-});
-_HttpClientModule.ɵinj = ɵɵdefineInjector({
-  providers: [provideHttpClient(withInterceptorsFromDi())]
-});
-var HttpClientModule = _HttpClientModule;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpClientModule, [{
     type: NgModule,
@@ -2078,18 +2111,23 @@ var HttpClientModule = _HttpClientModule;
     }]
   }], null, null);
 })();
-var _HttpClientJsonpModule = class _HttpClientJsonpModule {
+var HttpClientJsonpModule = class _HttpClientJsonpModule {
+  static {
+    this.ɵfac = function HttpClientJsonpModule_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HttpClientJsonpModule)();
+    };
+  }
+  static {
+    this.ɵmod = ɵɵdefineNgModule({
+      type: _HttpClientJsonpModule
+    });
+  }
+  static {
+    this.ɵinj = ɵɵdefineInjector({
+      providers: [withJsonpSupport().ɵproviders]
+    });
+  }
 };
-_HttpClientJsonpModule.ɵfac = function HttpClientJsonpModule_Factory(t) {
-  return new (t || _HttpClientJsonpModule)();
-};
-_HttpClientJsonpModule.ɵmod = ɵɵdefineNgModule({
-  type: _HttpClientJsonpModule
-});
-_HttpClientJsonpModule.ɵinj = ɵɵdefineInjector({
-  providers: [withJsonpSupport().ɵproviders]
-});
-var HttpClientJsonpModule = _HttpClientJsonpModule;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HttpClientJsonpModule, [{
     type: NgModule,
@@ -2311,9 +2349,7 @@ var BrowserDomAdapter = class _BrowserDomAdapter extends GenericBrowserDomAdapte
     el.dispatchEvent(evt);
   }
   remove(node) {
-    if (node.parentNode) {
-      node.parentNode.removeChild(node);
-    }
+    node.remove();
   }
   createElement(tagName, doc) {
     doc = doc || this.getDefaultDocument();
@@ -2411,26 +2447,29 @@ var BrowserGetTestability = class {
     return this.findTestabilityInTree(registry, elem.parentElement, true);
   }
 };
-var _BrowserXhr = class _BrowserXhr {
+var BrowserXhr = class _BrowserXhr {
   build() {
     return new XMLHttpRequest();
   }
+  static {
+    this.ɵfac = function BrowserXhr_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _BrowserXhr)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _BrowserXhr,
+      factory: _BrowserXhr.ɵfac
+    });
+  }
 };
-_BrowserXhr.ɵfac = function BrowserXhr_Factory(t) {
-  return new (t || _BrowserXhr)();
-};
-_BrowserXhr.ɵprov = ɵɵdefineInjectable({
-  token: _BrowserXhr,
-  factory: _BrowserXhr.ɵfac
-});
-var BrowserXhr = _BrowserXhr;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(BrowserXhr, [{
     type: Injectable
   }], null, null);
 })();
 var EVENT_MANAGER_PLUGINS = new InjectionToken(ngDevMode ? "EventManagerPlugins" : "");
-var _EventManager = class _EventManager {
+var EventManager = class _EventManager {
   /**
    * Initializes an instance of the event-manager service.
    */
@@ -2475,15 +2514,18 @@ var _EventManager = class _EventManager {
     this._eventNameToPlugin.set(eventName, plugin);
     return plugin;
   }
+  static {
+    this.ɵfac = function EventManager_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _EventManager)(ɵɵinject(EVENT_MANAGER_PLUGINS), ɵɵinject(NgZone));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _EventManager,
+      factory: _EventManager.ɵfac
+    });
+  }
 };
-_EventManager.ɵfac = function EventManager_Factory(t) {
-  return new (t || _EventManager)(ɵɵinject(EVENT_MANAGER_PLUGINS), ɵɵinject(NgZone));
-};
-_EventManager.ɵprov = ɵɵdefineInjectable({
-  token: _EventManager,
-  factory: _EventManager.ɵfac
-});
-var EventManager = _EventManager;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(EventManager, [{
     type: Injectable
@@ -2504,7 +2546,7 @@ var EventManagerPlugin = class {
   }
 };
 var APP_ID_ATTRIBUTE_NAME = "ng-app-id";
-var _SharedStylesHost = class _SharedStylesHost {
+var SharedStylesHost = class _SharedStylesHost {
   constructor(doc, appId, nonce, platformId = {}) {
     this.doc = doc;
     this.appId = appId;
@@ -2632,15 +2674,18 @@ var _SharedStylesHost = class _SharedStylesHost {
     hostNodes.clear();
     hostNodes.add(this.doc.head);
   }
+  static {
+    this.ɵfac = function SharedStylesHost_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _SharedStylesHost)(ɵɵinject(DOCUMENT), ɵɵinject(APP_ID), ɵɵinject(CSP_NONCE, 8), ɵɵinject(PLATFORM_ID));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _SharedStylesHost,
+      factory: _SharedStylesHost.ɵfac
+    });
+  }
 };
-_SharedStylesHost.ɵfac = function SharedStylesHost_Factory(t) {
-  return new (t || _SharedStylesHost)(ɵɵinject(DOCUMENT), ɵɵinject(APP_ID), ɵɵinject(CSP_NONCE, 8), ɵɵinject(PLATFORM_ID));
-};
-_SharedStylesHost.ɵprov = ɵɵdefineInjectable({
-  token: _SharedStylesHost,
-  factory: _SharedStylesHost.ɵfac
-});
-var SharedStylesHost = _SharedStylesHost;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(SharedStylesHost, [{
     type: Injectable
@@ -2698,7 +2743,7 @@ function shimHostAttribute(componentShortId) {
 function shimStylesContent(compId, styles) {
   return styles.map((s) => s.replace(COMPONENT_REGEX, compId));
 }
-var _DomRendererFactory2 = class _DomRendererFactory2 {
+var DomRendererFactory2 = class _DomRendererFactory2 {
   constructor(eventManager, sharedStylesHost, appId, removeStylesOnCompDestroy, doc, platformId, ngZone, nonce = null) {
     this.eventManager = eventManager;
     this.sharedStylesHost = sharedStylesHost;
@@ -2756,15 +2801,18 @@ var _DomRendererFactory2 = class _DomRendererFactory2 {
   ngOnDestroy() {
     this.rendererByCompId.clear();
   }
+  static {
+    this.ɵfac = function DomRendererFactory2_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _DomRendererFactory2)(ɵɵinject(EventManager), ɵɵinject(SharedStylesHost), ɵɵinject(APP_ID), ɵɵinject(REMOVE_STYLES_ON_COMPONENT_DESTROY), ɵɵinject(DOCUMENT), ɵɵinject(PLATFORM_ID), ɵɵinject(NgZone), ɵɵinject(CSP_NONCE));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _DomRendererFactory2,
+      factory: _DomRendererFactory2.ɵfac
+    });
+  }
 };
-_DomRendererFactory2.ɵfac = function DomRendererFactory2_Factory(t) {
-  return new (t || _DomRendererFactory2)(ɵɵinject(EventManager), ɵɵinject(SharedStylesHost), ɵɵinject(APP_ID), ɵɵinject(REMOVE_STYLES_ON_COMPONENT_DESTROY), ɵɵinject(DOCUMENT), ɵɵinject(PLATFORM_ID), ɵɵinject(NgZone), ɵɵinject(CSP_NONCE));
-};
-_DomRendererFactory2.ɵprov = ɵɵdefineInjectable({
-  token: _DomRendererFactory2,
-  factory: _DomRendererFactory2.ɵfac
-});
-var DomRendererFactory2 = _DomRendererFactory2;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(DomRendererFactory2, [{
     type: Injectable
@@ -2840,10 +2888,8 @@ var DefaultDomRenderer2 = class {
       targetParent.insertBefore(newChild, refChild);
     }
   }
-  removeChild(parent, oldChild) {
-    if (parent) {
-      parent.removeChild(oldChild);
-    }
+  removeChild(_parent, oldChild) {
+    oldChild.remove();
   }
   selectRootElement(selectorOrNode, preserveContent) {
     let el = typeof selectorOrNode === "string" ? this.doc.querySelector(selectorOrNode) : selectorOrNode;
@@ -2978,8 +3024,8 @@ var ShadowDomRenderer = class extends DefaultDomRenderer2 {
   insertBefore(parent, newChild, refChild) {
     return super.insertBefore(this.nodeOrShadowRoot(parent), newChild, refChild);
   }
-  removeChild(parent, oldChild) {
-    return super.removeChild(this.nodeOrShadowRoot(parent), oldChild);
+  removeChild(_parent, oldChild) {
+    return super.removeChild(null, oldChild);
   }
   parentNode(node) {
     return this.nodeOrShadowRoot(super.parentNode(this.nodeOrShadowRoot(node)));
@@ -3022,7 +3068,7 @@ var EmulatedEncapsulationDomRenderer2 = class extends NoneEncapsulationDomRender
     return el;
   }
 };
-var _DomEventsPlugin = class _DomEventsPlugin extends EventManagerPlugin {
+var DomEventsPlugin = class _DomEventsPlugin extends EventManagerPlugin {
   constructor(doc) {
     super(doc);
   }
@@ -3038,15 +3084,18 @@ var _DomEventsPlugin = class _DomEventsPlugin extends EventManagerPlugin {
   removeEventListener(target, eventName, callback) {
     return target.removeEventListener(eventName, callback);
   }
+  static {
+    this.ɵfac = function DomEventsPlugin_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _DomEventsPlugin)(ɵɵinject(DOCUMENT));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _DomEventsPlugin,
+      factory: _DomEventsPlugin.ɵfac
+    });
+  }
 };
-_DomEventsPlugin.ɵfac = function DomEventsPlugin_Factory(t) {
-  return new (t || _DomEventsPlugin)(ɵɵinject(DOCUMENT));
-};
-_DomEventsPlugin.ɵprov = ɵɵdefineInjectable({
-  token: _DomEventsPlugin,
-  factory: _DomEventsPlugin.ɵfac
-});
-var DomEventsPlugin = _DomEventsPlugin;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(DomEventsPlugin, [{
     type: Injectable
@@ -3058,7 +3107,7 @@ var DomEventsPlugin = _DomEventsPlugin;
     }]
   }], null);
 })();
-var _EventDelegationPlugin = class _EventDelegationPlugin extends EventManagerPlugin {
+var EventDelegationPlugin = class _EventDelegationPlugin extends EventManagerPlugin {
   constructor(doc) {
     super(doc);
     this.delegate = inject(GLOBAL_EVENT_DELEGATION, {
@@ -3074,15 +3123,18 @@ var _EventDelegationPlugin = class _EventDelegationPlugin extends EventManagerPl
   removeEventListener(element, eventName, callback) {
     return this.delegate.removeEventListener(element, eventName, callback);
   }
+  static {
+    this.ɵfac = function EventDelegationPlugin_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _EventDelegationPlugin)(ɵɵinject(DOCUMENT));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _EventDelegationPlugin,
+      factory: _EventDelegationPlugin.ɵfac
+    });
+  }
 };
-_EventDelegationPlugin.ɵfac = function EventDelegationPlugin_Factory(t) {
-  return new (t || _EventDelegationPlugin)(ɵɵinject(DOCUMENT));
-};
-_EventDelegationPlugin.ɵprov = ɵɵdefineInjectable({
-  token: _EventDelegationPlugin,
-  factory: _EventDelegationPlugin.ɵfac
-});
-var EventDelegationPlugin = _EventDelegationPlugin;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(EventDelegationPlugin, [{
     type: Injectable
@@ -3116,7 +3168,7 @@ var MODIFIER_KEY_GETTERS = {
   "meta": (event) => event.metaKey,
   "shift": (event) => event.shiftKey
 };
-var _KeyEventsPlugin = class _KeyEventsPlugin extends EventManagerPlugin {
+var KeyEventsPlugin = class _KeyEventsPlugin extends EventManagerPlugin {
   /**
    * Initializes an instance of the browser plug-in.
    * @param doc The document in which key events will be detected.
@@ -3238,15 +3290,18 @@ var _KeyEventsPlugin = class _KeyEventsPlugin extends EventManagerPlugin {
   static _normalizeKey(keyName) {
     return keyName === "esc" ? "escape" : keyName;
   }
+  static {
+    this.ɵfac = function KeyEventsPlugin_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _KeyEventsPlugin)(ɵɵinject(DOCUMENT));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _KeyEventsPlugin,
+      factory: _KeyEventsPlugin.ɵfac
+    });
+  }
 };
-_KeyEventsPlugin.ɵfac = function KeyEventsPlugin_Factory(t) {
-  return new (t || _KeyEventsPlugin)(ɵɵinject(DOCUMENT));
-};
-_KeyEventsPlugin.ɵprov = ɵɵdefineInjectable({
-  token: _KeyEventsPlugin,
-  factory: _KeyEventsPlugin.ɵfac
-});
-var KeyEventsPlugin = _KeyEventsPlugin;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(KeyEventsPlugin, [{
     type: Injectable
@@ -3345,7 +3400,7 @@ var BROWSER_MODULE_PROVIDERS = [{
   provide: BROWSER_MODULE_PROVIDERS_MARKER,
   useValue: true
 } : []];
-var _BrowserModule = class _BrowserModule {
+var BrowserModule = class _BrowserModule {
   constructor(providersAlreadyPresent) {
     if ((typeof ngDevMode === "undefined" || ngDevMode) && providersAlreadyPresent) {
       throw new RuntimeError(5100, `Providers from the \`BrowserModule\` have already been loaded. If you need access to common directives such as NgIf and NgFor, import the \`CommonModule\` instead.`);
@@ -3370,19 +3425,24 @@ var _BrowserModule = class _BrowserModule {
       }]
     };
   }
+  static {
+    this.ɵfac = function BrowserModule_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _BrowserModule)(ɵɵinject(BROWSER_MODULE_PROVIDERS_MARKER, 12));
+    };
+  }
+  static {
+    this.ɵmod = ɵɵdefineNgModule({
+      type: _BrowserModule,
+      exports: [CommonModule, ApplicationModule]
+    });
+  }
+  static {
+    this.ɵinj = ɵɵdefineInjector({
+      providers: [...BROWSER_MODULE_PROVIDERS, ...TESTABILITY_PROVIDERS],
+      imports: [CommonModule, ApplicationModule]
+    });
+  }
 };
-_BrowserModule.ɵfac = function BrowserModule_Factory(t) {
-  return new (t || _BrowserModule)(ɵɵinject(BROWSER_MODULE_PROVIDERS_MARKER, 12));
-};
-_BrowserModule.ɵmod = ɵɵdefineNgModule({
-  type: _BrowserModule,
-  exports: [CommonModule, ApplicationModule]
-});
-_BrowserModule.ɵinj = ɵɵdefineInjector({
-  providers: [...BROWSER_MODULE_PROVIDERS, ...TESTABILITY_PROVIDERS],
-  imports: [CommonModule, ApplicationModule]
-});
-var BrowserModule = _BrowserModule;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(BrowserModule, [{
     type: NgModule,
@@ -3402,7 +3462,7 @@ var BrowserModule = _BrowserModule;
     }]
   }], null);
 })();
-var _Meta = class _Meta {
+var Meta = class _Meta {
   constructor(_doc) {
     this._doc = _doc;
     this._dom = getDOM();
@@ -3520,16 +3580,19 @@ var _Meta = class _Meta {
   _getMetaKeyMap(prop) {
     return META_KEYS_MAP[prop] || prop;
   }
+  static {
+    this.ɵfac = function Meta_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _Meta)(ɵɵinject(DOCUMENT));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _Meta,
+      factory: _Meta.ɵfac,
+      providedIn: "root"
+    });
+  }
 };
-_Meta.ɵfac = function Meta_Factory(t) {
-  return new (t || _Meta)(ɵɵinject(DOCUMENT));
-};
-_Meta.ɵprov = ɵɵdefineInjectable({
-  token: _Meta,
-  factory: _Meta.ɵfac,
-  providedIn: "root"
-});
-var Meta = _Meta;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(Meta, [{
     type: Injectable,
@@ -3547,7 +3610,7 @@ var Meta = _Meta;
 var META_KEYS_MAP = {
   httpEquiv: "http-equiv"
 };
-var _Title = class _Title {
+var Title = class _Title {
   constructor(_doc) {
     this._doc = _doc;
   }
@@ -3564,16 +3627,19 @@ var _Title = class _Title {
   setTitle(newTitle) {
     this._doc.title = newTitle || "";
   }
+  static {
+    this.ɵfac = function Title_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _Title)(ɵɵinject(DOCUMENT));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _Title,
+      factory: _Title.ɵfac,
+      providedIn: "root"
+    });
+  }
 };
-_Title.ɵfac = function Title_Factory(t) {
-  return new (t || _Title)(ɵɵinject(DOCUMENT));
-};
-_Title.ɵprov = ɵɵdefineInjectable({
-  token: _Title,
-  factory: _Title.ɵfac,
-  providedIn: "root"
-});
-var Title = _Title;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(Title, [{
     type: Injectable,
@@ -3734,7 +3800,7 @@ var EVENT_NAMES = {
 };
 var HAMMER_GESTURE_CONFIG = new InjectionToken("HammerGestureConfig");
 var HAMMER_LOADER = new InjectionToken("HammerLoader");
-var _HammerGestureConfig = class _HammerGestureConfig {
+var HammerGestureConfig = class _HammerGestureConfig {
   constructor() {
     this.events = [];
     this.overrides = {};
@@ -3758,21 +3824,24 @@ var _HammerGestureConfig = class _HammerGestureConfig {
     }
     return mc;
   }
+  static {
+    this.ɵfac = function HammerGestureConfig_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HammerGestureConfig)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _HammerGestureConfig,
+      factory: _HammerGestureConfig.ɵfac
+    });
+  }
 };
-_HammerGestureConfig.ɵfac = function HammerGestureConfig_Factory(t) {
-  return new (t || _HammerGestureConfig)();
-};
-_HammerGestureConfig.ɵprov = ɵɵdefineInjectable({
-  token: _HammerGestureConfig,
-  factory: _HammerGestureConfig.ɵfac
-});
-var HammerGestureConfig = _HammerGestureConfig;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HammerGestureConfig, [{
     type: Injectable
   }], null, null);
 })();
-var _HammerGesturesPlugin = class _HammerGesturesPlugin extends EventManagerPlugin {
+var HammerGesturesPlugin = class _HammerGesturesPlugin extends EventManagerPlugin {
   constructor(doc, _config, console2, loader) {
     super(doc);
     this._config = _config;
@@ -3843,15 +3912,18 @@ var _HammerGesturesPlugin = class _HammerGesturesPlugin extends EventManagerPlug
   isCustomEvent(eventName) {
     return this._config.events.indexOf(eventName) > -1;
   }
+  static {
+    this.ɵfac = function HammerGesturesPlugin_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HammerGesturesPlugin)(ɵɵinject(DOCUMENT), ɵɵinject(HAMMER_GESTURE_CONFIG), ɵɵinject(Console), ɵɵinject(HAMMER_LOADER, 8));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _HammerGesturesPlugin,
+      factory: _HammerGesturesPlugin.ɵfac
+    });
+  }
 };
-_HammerGesturesPlugin.ɵfac = function HammerGesturesPlugin_Factory(t) {
-  return new (t || _HammerGesturesPlugin)(ɵɵinject(DOCUMENT), ɵɵinject(HAMMER_GESTURE_CONFIG), ɵɵinject(Console), ɵɵinject(HAMMER_LOADER, 8));
-};
-_HammerGesturesPlugin.ɵprov = ɵɵdefineInjectable({
-  token: _HammerGesturesPlugin,
-  factory: _HammerGesturesPlugin.ɵfac
-});
-var HammerGesturesPlugin = _HammerGesturesPlugin;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HammerGesturesPlugin, [{
     type: Injectable
@@ -3879,27 +3951,32 @@ var HammerGesturesPlugin = _HammerGesturesPlugin;
     }]
   }], null);
 })();
-var _HammerModule = class _HammerModule {
+var HammerModule = class _HammerModule {
+  static {
+    this.ɵfac = function HammerModule_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _HammerModule)();
+    };
+  }
+  static {
+    this.ɵmod = ɵɵdefineNgModule({
+      type: _HammerModule
+    });
+  }
+  static {
+    this.ɵinj = ɵɵdefineInjector({
+      providers: [{
+        provide: EVENT_MANAGER_PLUGINS,
+        useClass: HammerGesturesPlugin,
+        multi: true,
+        deps: [DOCUMENT, HAMMER_GESTURE_CONFIG, Console, [new Optional(), HAMMER_LOADER]]
+      }, {
+        provide: HAMMER_GESTURE_CONFIG,
+        useClass: HammerGestureConfig,
+        deps: []
+      }]
+    });
+  }
 };
-_HammerModule.ɵfac = function HammerModule_Factory(t) {
-  return new (t || _HammerModule)();
-};
-_HammerModule.ɵmod = ɵɵdefineNgModule({
-  type: _HammerModule
-});
-_HammerModule.ɵinj = ɵɵdefineInjector({
-  providers: [{
-    provide: EVENT_MANAGER_PLUGINS,
-    useClass: HammerGesturesPlugin,
-    multi: true,
-    deps: [DOCUMENT, HAMMER_GESTURE_CONFIG, Console, [new Optional(), HAMMER_LOADER]]
-  }, {
-    provide: HAMMER_GESTURE_CONFIG,
-    useClass: HammerGestureConfig,
-    deps: []
-  }]
-});
-var HammerModule = _HammerModule;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(HammerModule, [{
     type: NgModule,
@@ -3917,25 +3994,28 @@ var HammerModule = _HammerModule;
     }]
   }], null, null);
 })();
-var _DomSanitizer = class _DomSanitizer {
+var DomSanitizer = class _DomSanitizer {
+  static {
+    this.ɵfac = function DomSanitizer_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _DomSanitizer)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _DomSanitizer,
+      factory: function DomSanitizer_Factory(__ngFactoryType__) {
+        let __ngConditionalFactory__ = null;
+        if (__ngFactoryType__) {
+          __ngConditionalFactory__ = new (__ngFactoryType__ || _DomSanitizer)();
+        } else {
+          __ngConditionalFactory__ = ɵɵinject(DomSanitizerImpl);
+        }
+        return __ngConditionalFactory__;
+      },
+      providedIn: "root"
+    });
+  }
 };
-_DomSanitizer.ɵfac = function DomSanitizer_Factory(t) {
-  return new (t || _DomSanitizer)();
-};
-_DomSanitizer.ɵprov = ɵɵdefineInjectable({
-  token: _DomSanitizer,
-  factory: function DomSanitizer_Factory(t) {
-    let r = null;
-    if (t) {
-      r = new (t || _DomSanitizer)();
-    } else {
-      r = ɵɵinject(DomSanitizerImpl);
-    }
-    return r;
-  },
-  providedIn: "root"
-});
-var DomSanitizer = _DomSanitizer;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(DomSanitizer, [{
     type: Injectable,
@@ -3945,7 +4025,7 @@ var DomSanitizer = _DomSanitizer;
     }]
   }], null, null);
 })();
-var _DomSanitizerImpl = class _DomSanitizerImpl extends DomSanitizer {
+var DomSanitizerImpl = class _DomSanitizerImpl extends DomSanitizer {
   constructor(_doc) {
     super();
     this._doc = _doc;
@@ -4019,16 +4099,19 @@ var _DomSanitizerImpl = class _DomSanitizerImpl extends DomSanitizer {
   bypassSecurityTrustResourceUrl(value) {
     return bypassSanitizationTrustResourceUrl(value);
   }
+  static {
+    this.ɵfac = function DomSanitizerImpl_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _DomSanitizerImpl)(ɵɵinject(DOCUMENT));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _DomSanitizerImpl,
+      factory: _DomSanitizerImpl.ɵfac,
+      providedIn: "root"
+    });
+  }
 };
-_DomSanitizerImpl.ɵfac = function DomSanitizerImpl_Factory(t) {
-  return new (t || _DomSanitizerImpl)(ɵɵinject(DOCUMENT));
-};
-_DomSanitizerImpl.ɵprov = ɵɵdefineInjectable({
-  token: _DomSanitizerImpl,
-  factory: _DomSanitizerImpl.ɵfac,
-  providedIn: "root"
-});
-var DomSanitizerImpl = _DomSanitizerImpl;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(DomSanitizerImpl, [{
     type: Injectable,
@@ -4073,7 +4156,8 @@ function provideZoneJsCompatibilityDetector() {
     provide: ENVIRONMENT_INITIALIZER,
     useValue: () => {
       const ngZone = inject(NgZone);
-      if (ngZone.constructor !== NgZone) {
+      const isZoneless = inject(ZONELESS_ENABLED);
+      if (!isZoneless && ngZone.constructor !== NgZone) {
         const console2 = inject(Console);
         const message = formatRuntimeError(-5e3, "Angular detected that hydration was enabled for an application that uses a custom or a noop Zone.js implementation. This is not yet a fully supported configuration.");
         console2.warn(message);
@@ -4100,7 +4184,7 @@ function provideClientHydration(...features) {
   }
   return makeEnvironmentProviders([typeof ngDevMode !== "undefined" && ngDevMode ? provideZoneJsCompatibilityDetector() : [], withDomHydration(), featuresKind.has(HydrationFeatureKind.NoHttpTransferCache) || hasHttpTransferCacheOptions ? [] : withHttpTransferCache({}), providers]);
 }
-var VERSION = new Version("18.1.2");
+var VERSION = new Version("18.2.6");
 export {
   BrowserModule,
   By,
@@ -4144,14 +4228,14 @@ export {
 
 @angular/common/fesm2022/http.mjs:
   (**
-   * @license Angular v18.1.2
+   * @license Angular v18.2.6
    * (c) 2010-2024 Google LLC. https://angular.io/
    * License: MIT
    *)
 
 @angular/platform-browser/fesm2022/platform-browser.mjs:
   (**
-   * @license Angular v18.1.2
+   * @license Angular v18.2.6
    * (c) 2010-2024 Google LLC. https://angular.io/
    * License: MIT
    *)

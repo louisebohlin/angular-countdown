@@ -470,12 +470,8 @@ function __generator(thisArg, body) {
     },
     trys: [],
     ops: []
-  }, f, y, t, g;
-  return g = {
-    next: verb(0),
-    "throw": verb(1),
-    "return": verb(2)
-  }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
+  }, f, y, t, g = Object.create((typeof Iterator === "function" ? Iterator : Object).prototype);
+  return g.next = verb(0), g["throw"] = verb(1), g["return"] = verb(2), typeof Symbol === "function" && (g[Symbol.iterator] = function() {
     return this;
   }), g;
   function verb(n) {
@@ -593,7 +589,7 @@ function __await(v) {
 function __asyncGenerator(thisArg, _arguments, generator) {
   if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
   var g = generator.apply(thisArg, _arguments || []), i, q = [];
-  return i = {}, verb("next"), verb("throw"), verb("return", awaitReturn), i[Symbol.asyncIterator] = function() {
+  return i = Object.create((typeof AsyncIterator === "function" ? AsyncIterator : Object).prototype), verb("next"), verb("throw"), verb("return", awaitReturn), i[Symbol.asyncIterator] = function() {
     return this;
   }, i;
   function awaitReturn(f) {
@@ -3800,16 +3796,19 @@ var REGEXP_SEMICOLON = /\s*;\s*/;
 var DEFAULT_EVENT_TYPE = EventType.CLICK;
 var ActionResolver = class {
   constructor({
-    syntheticMouseEventSupport = false
+    syntheticMouseEventSupport = false,
+    clickModSupport = true
   } = {}) {
     this.a11yClickSupport = false;
+    this.clickModSupport = true;
     this.updateEventInfoForA11yClick = void 0;
     this.preventDefaultForA11yClick = void 0;
     this.populateClickOnlyAction = void 0;
     this.syntheticMouseEventSupport = syntheticMouseEventSupport;
+    this.clickModSupport = clickModSupport;
   }
   resolveEventType(eventInfo) {
-    if (getEventType(eventInfo) === EventType.CLICK && isModifiedClickEvent(getEvent(eventInfo))) {
+    if (this.clickModSupport && getEventType(eventInfo) === EventType.CLICK && isModifiedClickEvent(getEvent(eventInfo))) {
       setEventType(eventInfo, EventType.CLICKMOD);
     } else if (this.a11yClickSupport) {
       this.updateEventInfoForA11yClick(eventInfo);
@@ -4041,9 +4040,12 @@ var PREVENT_DEFAULT_ERROR_MESSAGE = `\`preventDefault\` called during event repl
 var COMPOSED_PATH_ERROR_MESSAGE_DETAILS = " Because event replay occurs after browser dispatch, `composedPath()` will be empty. Iterate parent nodes from `event.target` or `event.currentTarget` if you need to check elements in the event path.";
 var COMPOSED_PATH_ERROR_MESSAGE = `\`composedPath\` called during event replay.`;
 var EventDispatcher = class {
-  constructor(dispatchDelegate) {
+  constructor(dispatchDelegate, clickModSupport = true) {
     this.dispatchDelegate = dispatchDelegate;
-    this.actionResolver = new ActionResolver();
+    this.clickModSupport = clickModSupport;
+    this.actionResolver = new ActionResolver({
+      clickModSupport
+    });
     this.dispatcher = new Dispatcher((eventInfoWrapper) => {
       this.dispatchToDelegate(eventInfoWrapper);
     }, {
@@ -4064,6 +4066,9 @@ var EventDispatcher = class {
     prepareEventForBubbling(eventInfoWrapper);
     while (eventInfoWrapper.getAction()) {
       prepareEventForDispatch(eventInfoWrapper);
+      if (isCaptureEventType(eventInfoWrapper.getEventType()) && eventInfoWrapper.getAction().element !== eventInfoWrapper.getTargetElement()) {
+        return;
+      }
       this.dispatchDelegate(eventInfoWrapper.getEvent(), eventInfoWrapper.getAction().name);
       if (propagationStopped(eventInfoWrapper)) {
         return;
@@ -4074,8 +4079,10 @@ var EventDispatcher = class {
 };
 function prepareEventForBubbling(eventInfoWrapper) {
   const event = eventInfoWrapper.getEvent();
+  const originalStopPropagation = eventInfoWrapper.getEvent().stopPropagation.bind(event);
   const stopPropagation = () => {
     event[PROPAGATION_STOPPED_SYMBOL] = true;
+    originalStopPropagation();
   };
   patchEventInstance(event, "stopPropagation", stopPropagation);
   patchEventInstance(event, "stopImmediatePropagation", stopPropagation);
@@ -4087,9 +4094,11 @@ function propagationStopped(eventInfoWrapper) {
 function prepareEventForReplay(eventInfoWrapper) {
   const event = eventInfoWrapper.getEvent();
   const target = eventInfoWrapper.getTargetElement();
+  const originalPreventDefault = event.preventDefault.bind(event);
   patchEventInstance(event, "target", target);
   patchEventInstance(event, "eventPhase", EventPhase.REPLAY);
   patchEventInstance(event, "preventDefault", () => {
+    originalPreventDefault();
     throw new Error(PREVENT_DEFAULT_ERROR_MESSAGE + (ngDevMode ? PREVENT_DEFAULT_ERROR_MESSAGE_DETAILS : ""));
   });
   patchEventInstance(event, "composedPath", () => {
@@ -4140,7 +4149,10 @@ function removeEventListeners(container, eventTypes, earlyEventHandler, capture)
   }
 }
 var MOUSE_SPECIAL_SUPPORT = false;
-var _EventContract = class _EventContract {
+var EventContract = class _EventContract {
+  static {
+    this.MOUSE_SPECIAL_SUPPORT = MOUSE_SPECIAL_SUPPORT;
+  }
   constructor(containerManager) {
     this.eventHandlers = {};
     this.browserEventTypeToExtraEventTypes = {};
@@ -4298,8 +4310,6 @@ var _EventContract = class _EventContract {
     }
   }
 };
-_EventContract.MOUSE_SPECIAL_SUPPORT = MOUSE_SPECIAL_SUPPORT;
-var EventContract = _EventContract;
 function getAppScopedQueuedEventInfos(appId, dataContainer = window) {
   return getQueuedEventInfos(dataContainer._ejsas?.[appId]);
 }
@@ -6950,7 +6960,7 @@ function requiresRefreshOrTraversal(lView) {
 }
 function updateAncestorTraversalFlagsOnAttach(lView) {
   lView[ENVIRONMENT].changeDetectionScheduler?.notify(
-    7
+    8
     /* NotificationSource.ViewAttached */
   );
   if (lView[FLAGS] & 64) {
@@ -7460,6 +7470,9 @@ function toTNodeTypeAsString(tNodeType) {
 }
 function isTNodeShape(value) {
   return value != null && typeof value === "object" && (value.insertBeforeIndex === null || typeof value.insertBeforeIndex === "number" || Array.isArray(value.insertBeforeIndex));
+}
+function isLetDeclaration(tNode) {
+  return !!(tNode.type & 128);
 }
 function hasClassInput(tNode) {
   return (tNode.flags & 8) !== 0;
@@ -8124,7 +8137,13 @@ function createInjectorWithoutInjectorInstances(defType, parent = null, addition
   name = name || (typeof defType === "object" ? void 0 : stringify(defType));
   return new R3Injector(providers, parent || getNullInjector(), name || null, scopes);
 }
-var _Injector = class _Injector {
+var Injector = class _Injector {
+  static {
+    this.THROW_IF_NOT_FOUND = THROW_IF_NOT_FOUND;
+  }
+  static {
+    this.NULL = new NullInjector();
+  }
   static create(options, parent) {
     if (Array.isArray(options)) {
       return createInjector({
@@ -8137,16 +8156,17 @@ var _Injector = class _Injector {
       }, options.parent, options.providers, name);
     }
   }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _Injector,
+      providedIn: "any",
+      factory: () => ɵɵinject(INJECTOR$1)
+    });
+  }
+  static {
+    this.__NG_ELEMENT_ID__ = -1;
+  }
 };
-_Injector.THROW_IF_NOT_FOUND = THROW_IF_NOT_FOUND;
-_Injector.NULL = new NullInjector();
-_Injector.ɵprov = ɵɵdefineInjectable({
-  token: _Injector,
-  providedIn: "any",
-  factory: () => ɵɵinject(INJECTOR$1)
-});
-_Injector.__NG_ELEMENT_ID__ = -1;
-var Injector = _Injector;
 var HostAttributeToken = class {
   constructor(attributeName) {
     this.attributeName = attributeName;
@@ -8185,6 +8205,499 @@ var ERROR_ORIGINAL_ERROR = "ngOriginalError";
 function getOriginalError(error) {
   return error[ERROR_ORIGINAL_ERROR];
 }
+var SCHEDULE_IN_ROOT_ZONE_DEFAULT = true;
+var DestroyRef = class {
+  static {
+    this.__NG_ELEMENT_ID__ = injectDestroyRef;
+  }
+  static {
+    this.__NG_ENV_ID__ = (injector) => injector;
+  }
+};
+var NodeInjectorDestroyRef = class extends DestroyRef {
+  constructor(_lView) {
+    super();
+    this._lView = _lView;
+  }
+  onDestroy(callback) {
+    storeLViewOnDestroy(this._lView, callback);
+    return () => removeLViewOnDestroy(this._lView, callback);
+  }
+};
+function injectDestroyRef() {
+  return new NodeInjectorDestroyRef(getLView());
+}
+var PendingTasks = class _PendingTasks {
+  constructor() {
+    this.taskId = 0;
+    this.pendingTasks = /* @__PURE__ */ new Set();
+    this.hasPendingTasks = new BehaviorSubject(false);
+  }
+  get _hasPendingTasks() {
+    return this.hasPendingTasks.value;
+  }
+  add() {
+    if (!this._hasPendingTasks) {
+      this.hasPendingTasks.next(true);
+    }
+    const taskId = this.taskId++;
+    this.pendingTasks.add(taskId);
+    return taskId;
+  }
+  remove(taskId) {
+    this.pendingTasks.delete(taskId);
+    if (this.pendingTasks.size === 0 && this._hasPendingTasks) {
+      this.hasPendingTasks.next(false);
+    }
+  }
+  ngOnDestroy() {
+    this.pendingTasks.clear();
+    if (this._hasPendingTasks) {
+      this.hasPendingTasks.next(false);
+    }
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _PendingTasks,
+      providedIn: "root",
+      factory: () => new _PendingTasks()
+    });
+  }
+};
+var ExperimentalPendingTasks = class _ExperimentalPendingTasks {
+  constructor() {
+    this.internalPendingTasks = inject(PendingTasks);
+  }
+  /**
+   * Adds a new task that should block application's stability.
+   * @returns A cleanup function that removes a task when called.
+   */
+  add() {
+    const taskId = this.internalPendingTasks.add();
+    return () => this.internalPendingTasks.remove(taskId);
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _ExperimentalPendingTasks,
+      providedIn: "root",
+      factory: () => new _ExperimentalPendingTasks()
+    });
+  }
+};
+var EventEmitter_ = class extends Subject {
+  constructor(isAsync = false) {
+    super();
+    this.destroyRef = void 0;
+    this.pendingTasks = void 0;
+    this.__isAsync = isAsync;
+    if (isInInjectionContext()) {
+      this.destroyRef = inject(DestroyRef, {
+        optional: true
+      }) ?? void 0;
+      this.pendingTasks = inject(PendingTasks, {
+        optional: true
+      }) ?? void 0;
+    }
+  }
+  emit(value) {
+    const prevConsumer = setActiveConsumer(null);
+    try {
+      super.next(value);
+    } finally {
+      setActiveConsumer(prevConsumer);
+    }
+  }
+  subscribe(observerOrNext, error, complete) {
+    let nextFn = observerOrNext;
+    let errorFn = error || (() => null);
+    let completeFn = complete;
+    if (observerOrNext && typeof observerOrNext === "object") {
+      const observer = observerOrNext;
+      nextFn = observer.next?.bind(observer);
+      errorFn = observer.error?.bind(observer);
+      completeFn = observer.complete?.bind(observer);
+    }
+    if (this.__isAsync) {
+      errorFn = this.wrapInTimeout(errorFn);
+      if (nextFn) {
+        nextFn = this.wrapInTimeout(nextFn);
+      }
+      if (completeFn) {
+        completeFn = this.wrapInTimeout(completeFn);
+      }
+    }
+    const sink = super.subscribe({
+      next: nextFn,
+      error: errorFn,
+      complete: completeFn
+    });
+    if (observerOrNext instanceof Subscription) {
+      observerOrNext.add(sink);
+    }
+    return sink;
+  }
+  wrapInTimeout(fn) {
+    return (value) => {
+      const taskId = this.pendingTasks?.add();
+      setTimeout(() => {
+        fn(value);
+        if (taskId !== void 0) {
+          this.pendingTasks?.remove(taskId);
+        }
+      });
+    };
+  }
+};
+var EventEmitter = EventEmitter_;
+function noop2(...args) {
+}
+function scheduleCallbackWithRafRace(callback) {
+  let timeoutId;
+  let animationFrameId;
+  function cleanup() {
+    callback = noop2;
+    try {
+      if (animationFrameId !== void 0 && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(animationFrameId);
+      }
+      if (timeoutId !== void 0) {
+        clearTimeout(timeoutId);
+      }
+    } catch {
+    }
+  }
+  timeoutId = setTimeout(() => {
+    callback();
+    cleanup();
+  });
+  if (typeof requestAnimationFrame === "function") {
+    animationFrameId = requestAnimationFrame(() => {
+      callback();
+      cleanup();
+    });
+  }
+  return () => cleanup();
+}
+function scheduleCallbackWithMicrotask(callback) {
+  queueMicrotask(() => callback());
+  return () => {
+    callback = noop2;
+  };
+}
+var AsyncStackTaggingZoneSpec = class {
+  constructor(namePrefix, consoleAsyncStackTaggingImpl = console) {
+    this.name = "asyncStackTagging for " + namePrefix;
+    this.createTask = consoleAsyncStackTaggingImpl?.createTask ?? (() => null);
+  }
+  onScheduleTask(delegate, _current, target, task) {
+    task.consoleTask = this.createTask(`Zone - ${task.source || task.type}`);
+    return delegate.scheduleTask(target, task);
+  }
+  onInvokeTask(delegate, _currentZone, targetZone, task, applyThis, applyArgs) {
+    let ret;
+    if (task.consoleTask) {
+      ret = task.consoleTask.run(() => delegate.invokeTask(targetZone, task, applyThis, applyArgs));
+    } else {
+      ret = delegate.invokeTask(targetZone, task, applyThis, applyArgs);
+    }
+    return ret;
+  }
+};
+var isAngularZoneProperty = "isAngularZone";
+var angularZoneInstanceIdProperty = isAngularZoneProperty + "_ID";
+var ngZoneInstanceId = 0;
+var NgZone = class _NgZone {
+  constructor(options) {
+    this.hasPendingMacrotasks = false;
+    this.hasPendingMicrotasks = false;
+    this.isStable = true;
+    this.onUnstable = new EventEmitter(false);
+    this.onMicrotaskEmpty = new EventEmitter(false);
+    this.onStable = new EventEmitter(false);
+    this.onError = new EventEmitter(false);
+    const {
+      enableLongStackTrace = false,
+      shouldCoalesceEventChangeDetection = false,
+      shouldCoalesceRunChangeDetection = false,
+      scheduleInRootZone = SCHEDULE_IN_ROOT_ZONE_DEFAULT
+    } = options;
+    if (typeof Zone == "undefined") {
+      throw new RuntimeError(908, ngDevMode && `In this configuration Angular requires Zone.js`);
+    }
+    Zone.assertZonePatched();
+    const self = this;
+    self._nesting = 0;
+    self._outer = self._inner = Zone.current;
+    if (ngDevMode) {
+      self._inner = self._inner.fork(new AsyncStackTaggingZoneSpec("Angular"));
+    }
+    if (Zone["TaskTrackingZoneSpec"]) {
+      self._inner = self._inner.fork(new Zone["TaskTrackingZoneSpec"]());
+    }
+    if (enableLongStackTrace && Zone["longStackTraceZoneSpec"]) {
+      self._inner = self._inner.fork(Zone["longStackTraceZoneSpec"]);
+    }
+    self.shouldCoalesceEventChangeDetection = !shouldCoalesceRunChangeDetection && shouldCoalesceEventChangeDetection;
+    self.shouldCoalesceRunChangeDetection = shouldCoalesceRunChangeDetection;
+    self.callbackScheduled = false;
+    self.scheduleInRootZone = scheduleInRootZone;
+    forkInnerZoneWithAngularBehavior(self);
+  }
+  /**
+    This method checks whether the method call happens within an Angular Zone instance.
+  */
+  static isInAngularZone() {
+    return typeof Zone !== "undefined" && Zone.current.get(isAngularZoneProperty) === true;
+  }
+  /**
+    Assures that the method is called within the Angular Zone, otherwise throws an error.
+  */
+  static assertInAngularZone() {
+    if (!_NgZone.isInAngularZone()) {
+      throw new RuntimeError(909, ngDevMode && "Expected to be in Angular Zone, but it is not!");
+    }
+  }
+  /**
+    Assures that the method is called outside of the Angular Zone, otherwise throws an error.
+  */
+  static assertNotInAngularZone() {
+    if (_NgZone.isInAngularZone()) {
+      throw new RuntimeError(909, ngDevMode && "Expected to not be in Angular Zone, but it is!");
+    }
+  }
+  /**
+   * Executes the `fn` function synchronously within the Angular zone and returns value returned by
+   * the function.
+   *
+   * Running functions via `run` allows you to reenter Angular zone from a task that was executed
+   * outside of the Angular zone (typically started via {@link #runOutsideAngular}).
+   *
+   * Any future tasks or microtasks scheduled from within this function will continue executing from
+   * within the Angular zone.
+   *
+   * If a synchronous error happens it will be rethrown and not reported via `onError`.
+   */
+  run(fn, applyThis, applyArgs) {
+    return this._inner.run(fn, applyThis, applyArgs);
+  }
+  /**
+   * Executes the `fn` function synchronously within the Angular zone as a task and returns value
+   * returned by the function.
+   *
+   * Running functions via `run` allows you to reenter Angular zone from a task that was executed
+   * outside of the Angular zone (typically started via {@link #runOutsideAngular}).
+   *
+   * Any future tasks or microtasks scheduled from within this function will continue executing from
+   * within the Angular zone.
+   *
+   * If a synchronous error happens it will be rethrown and not reported via `onError`.
+   */
+  runTask(fn, applyThis, applyArgs, name) {
+    const zone = this._inner;
+    const task = zone.scheduleEventTask("NgZoneEvent: " + name, fn, EMPTY_PAYLOAD, noop2, noop2);
+    try {
+      return zone.runTask(task, applyThis, applyArgs);
+    } finally {
+      zone.cancelTask(task);
+    }
+  }
+  /**
+   * Same as `run`, except that synchronous errors are caught and forwarded via `onError` and not
+   * rethrown.
+   */
+  runGuarded(fn, applyThis, applyArgs) {
+    return this._inner.runGuarded(fn, applyThis, applyArgs);
+  }
+  /**
+   * Executes the `fn` function synchronously in Angular's parent zone and returns value returned by
+   * the function.
+   *
+   * Running functions via {@link #runOutsideAngular} allows you to escape Angular's zone and do
+   * work that
+   * doesn't trigger Angular change-detection or is subject to Angular's error handling.
+   *
+   * Any future tasks or microtasks scheduled from within this function will continue executing from
+   * outside of the Angular zone.
+   *
+   * Use {@link #run} to reenter the Angular zone and do work that updates the application model.
+   */
+  runOutsideAngular(fn) {
+    return this._outer.run(fn);
+  }
+};
+var EMPTY_PAYLOAD = {};
+function checkStable(zone) {
+  if (zone._nesting == 0 && !zone.hasPendingMicrotasks && !zone.isStable) {
+    try {
+      zone._nesting++;
+      zone.onMicrotaskEmpty.emit(null);
+    } finally {
+      zone._nesting--;
+      if (!zone.hasPendingMicrotasks) {
+        try {
+          zone.runOutsideAngular(() => zone.onStable.emit(null));
+        } finally {
+          zone.isStable = true;
+        }
+      }
+    }
+  }
+}
+function delayChangeDetectionForEvents(zone) {
+  if (zone.isCheckStableRunning || zone.callbackScheduled) {
+    return;
+  }
+  zone.callbackScheduled = true;
+  function scheduleCheckStable() {
+    scheduleCallbackWithRafRace(() => {
+      zone.callbackScheduled = false;
+      updateMicroTaskStatus(zone);
+      zone.isCheckStableRunning = true;
+      checkStable(zone);
+      zone.isCheckStableRunning = false;
+    });
+  }
+  if (zone.scheduleInRootZone) {
+    Zone.root.run(() => {
+      scheduleCheckStable();
+    });
+  } else {
+    zone._outer.run(() => {
+      scheduleCheckStable();
+    });
+  }
+  updateMicroTaskStatus(zone);
+}
+function forkInnerZoneWithAngularBehavior(zone) {
+  const delayChangeDetectionForEventsDelegate = () => {
+    delayChangeDetectionForEvents(zone);
+  };
+  const instanceId = ngZoneInstanceId++;
+  zone._inner = zone._inner.fork({
+    name: "angular",
+    properties: {
+      [isAngularZoneProperty]: true,
+      [angularZoneInstanceIdProperty]: instanceId,
+      [angularZoneInstanceIdProperty + instanceId]: true
+    },
+    onInvokeTask: (delegate, current, target, task, applyThis, applyArgs) => {
+      if (shouldBeIgnoredByZone(applyArgs)) {
+        return delegate.invokeTask(target, task, applyThis, applyArgs);
+      }
+      try {
+        onEnter(zone);
+        return delegate.invokeTask(target, task, applyThis, applyArgs);
+      } finally {
+        if (zone.shouldCoalesceEventChangeDetection && task.type === "eventTask" || zone.shouldCoalesceRunChangeDetection) {
+          delayChangeDetectionForEventsDelegate();
+        }
+        onLeave(zone);
+      }
+    },
+    onInvoke: (delegate, current, target, callback, applyThis, applyArgs, source) => {
+      try {
+        onEnter(zone);
+        return delegate.invoke(target, callback, applyThis, applyArgs, source);
+      } finally {
+        if (zone.shouldCoalesceRunChangeDetection && // Do not delay change detection when the task is the scheduler's tick.
+        // We need to synchronously trigger the stability logic so that the
+        // zone-based scheduler can prevent a duplicate ApplicationRef.tick
+        // by first checking if the scheduler tick is running. This does seem a bit roundabout,
+        // but we _do_ still want to trigger all the correct events when we exit the zone.run
+        // (`onMicrotaskEmpty` and `onStable` _should_ emit; developers can have code which
+        // relies on these events happening after change detection runs).
+        // Note: `zone.callbackScheduled` is already in delayChangeDetectionForEventsDelegate
+        // but is added here as well to prevent reads of applyArgs when not necessary
+        !zone.callbackScheduled && !isSchedulerTick(applyArgs)) {
+          delayChangeDetectionForEventsDelegate();
+        }
+        onLeave(zone);
+      }
+    },
+    onHasTask: (delegate, current, target, hasTaskState) => {
+      delegate.hasTask(target, hasTaskState);
+      if (current === target) {
+        if (hasTaskState.change == "microTask") {
+          zone._hasPendingMicrotasks = hasTaskState.microTask;
+          updateMicroTaskStatus(zone);
+          checkStable(zone);
+        } else if (hasTaskState.change == "macroTask") {
+          zone.hasPendingMacrotasks = hasTaskState.macroTask;
+        }
+      }
+    },
+    onHandleError: (delegate, current, target, error) => {
+      delegate.handleError(target, error);
+      zone.runOutsideAngular(() => zone.onError.emit(error));
+      return false;
+    }
+  });
+}
+function updateMicroTaskStatus(zone) {
+  if (zone._hasPendingMicrotasks || (zone.shouldCoalesceEventChangeDetection || zone.shouldCoalesceRunChangeDetection) && zone.callbackScheduled === true) {
+    zone.hasPendingMicrotasks = true;
+  } else {
+    zone.hasPendingMicrotasks = false;
+  }
+}
+function onEnter(zone) {
+  zone._nesting++;
+  if (zone.isStable) {
+    zone.isStable = false;
+    zone.onUnstable.emit(null);
+  }
+}
+function onLeave(zone) {
+  zone._nesting--;
+  checkStable(zone);
+}
+var NoopNgZone = class {
+  constructor() {
+    this.hasPendingMicrotasks = false;
+    this.hasPendingMacrotasks = false;
+    this.isStable = true;
+    this.onUnstable = new EventEmitter();
+    this.onMicrotaskEmpty = new EventEmitter();
+    this.onStable = new EventEmitter();
+    this.onError = new EventEmitter();
+  }
+  run(fn, applyThis, applyArgs) {
+    return fn.apply(applyThis, applyArgs);
+  }
+  runGuarded(fn, applyThis, applyArgs) {
+    return fn.apply(applyThis, applyArgs);
+  }
+  runOutsideAngular(fn) {
+    return fn();
+  }
+  runTask(fn, applyThis, applyArgs, name) {
+    return fn.apply(applyThis, applyArgs);
+  }
+};
+function shouldBeIgnoredByZone(applyArgs) {
+  return hasApplyArgsData(applyArgs, "__ignore_ng_zone__");
+}
+function isSchedulerTick(applyArgs) {
+  return hasApplyArgsData(applyArgs, "__scheduler_tick__");
+}
+function hasApplyArgsData(applyArgs, key) {
+  if (!Array.isArray(applyArgs)) {
+    return false;
+  }
+  if (applyArgs.length !== 1) {
+    return false;
+  }
+  return applyArgs[0]?.data?.[key] === true;
+}
+function getNgZone(ngZoneToUse = "zone.js", options) {
+  if (ngZoneToUse === "noop") {
+    return new NoopNgZone();
+  }
+  if (ngZoneToUse === "zone.js") {
+    return new NgZone(options);
+  }
+  return ngZoneToUse;
+}
 var ErrorHandler = class {
   constructor() {
     this._console = console;
@@ -8208,28 +8721,11 @@ var ErrorHandler = class {
 var INTERNAL_APPLICATION_ERROR_HANDLER = new InjectionToken(typeof ngDevMode === "undefined" || ngDevMode ? "internal error handler" : "", {
   providedIn: "root",
   factory: () => {
+    const zone = inject(NgZone);
     const userErrorHandler = inject(ErrorHandler);
-    return userErrorHandler.handleError.bind(void 0);
+    return (e) => zone.runOutsideAngular(() => userErrorHandler.handleError(e));
   }
 });
-var _DestroyRef = class _DestroyRef {
-};
-_DestroyRef.__NG_ELEMENT_ID__ = injectDestroyRef;
-_DestroyRef.__NG_ENV_ID__ = (injector) => injector;
-var DestroyRef = _DestroyRef;
-var NodeInjectorDestroyRef = class extends DestroyRef {
-  constructor(_lView) {
-    super();
-    this._lView = _lView;
-  }
-  onDestroy(callback) {
-    storeLViewOnDestroy(this._lView, callback);
-    return () => removeLViewOnDestroy(this._lView, callback);
-  }
-};
-function injectDestroyRef() {
-  return new NodeInjectorDestroyRef(getLView());
-}
 var OutputEmitterRef = class {
   constructor() {
     this.destroyed = false;
@@ -8304,140 +8800,24 @@ function injectElementRef() {
 function createElementRef(tNode, lView) {
   return new ElementRef(getNativeByTNode(tNode, lView));
 }
-var _ElementRef = class _ElementRef {
+var ElementRef = class {
   constructor(nativeElement) {
     this.nativeElement = nativeElement;
   }
+  static {
+    this.__NG_ELEMENT_ID__ = injectElementRef;
+  }
 };
-_ElementRef.__NG_ELEMENT_ID__ = injectElementRef;
-var ElementRef = _ElementRef;
 function unwrapElementRef(value) {
   return value instanceof ElementRef ? value.nativeElement : value;
 }
-var _PendingTasks = class _PendingTasks {
-  constructor() {
-    this.taskId = 0;
-    this.pendingTasks = /* @__PURE__ */ new Set();
-    this.hasPendingTasks = new BehaviorSubject(false);
-  }
-  get _hasPendingTasks() {
-    return this.hasPendingTasks.value;
-  }
-  add() {
-    if (!this._hasPendingTasks) {
-      this.hasPendingTasks.next(true);
-    }
-    const taskId = this.taskId++;
-    this.pendingTasks.add(taskId);
-    return taskId;
-  }
-  remove(taskId) {
-    this.pendingTasks.delete(taskId);
-    if (this.pendingTasks.size === 0 && this._hasPendingTasks) {
-      this.hasPendingTasks.next(false);
-    }
-  }
-  ngOnDestroy() {
-    this.pendingTasks.clear();
-    if (this._hasPendingTasks) {
-      this.hasPendingTasks.next(false);
-    }
-  }
-};
-_PendingTasks.ɵprov = ɵɵdefineInjectable({
-  token: _PendingTasks,
-  providedIn: "root",
-  factory: () => new _PendingTasks()
-});
-var PendingTasks = _PendingTasks;
-var _ExperimentalPendingTasks = class _ExperimentalPendingTasks {
-  constructor() {
-    this.internalPendingTasks = inject(PendingTasks);
-  }
-  /**
-   * Adds a new task that should block application's stability.
-   * @returns A cleanup function that removes a task when called.
-   */
-  add() {
-    const taskId = this.internalPendingTasks.add();
-    return () => this.internalPendingTasks.remove(taskId);
-  }
-};
-_ExperimentalPendingTasks.ɵprov = ɵɵdefineInjectable({
-  token: _ExperimentalPendingTasks,
-  providedIn: "root",
-  factory: () => new _ExperimentalPendingTasks()
-});
-var ExperimentalPendingTasks = _ExperimentalPendingTasks;
-var EventEmitter_ = class extends Subject {
-  constructor(isAsync = false) {
-    super();
-    this.destroyRef = void 0;
-    this.pendingTasks = void 0;
-    this.__isAsync = isAsync;
-    if (isInInjectionContext()) {
-      this.destroyRef = inject(DestroyRef, {
-        optional: true
-      }) ?? void 0;
-      this.pendingTasks = inject(PendingTasks, {
-        optional: true
-      }) ?? void 0;
-    }
-  }
-  emit(value) {
-    const prevConsumer = setActiveConsumer(null);
-    try {
-      super.next(value);
-    } finally {
-      setActiveConsumer(prevConsumer);
-    }
-  }
-  subscribe(observerOrNext, error, complete) {
-    let nextFn = observerOrNext;
-    let errorFn = error || (() => null);
-    let completeFn = complete;
-    if (observerOrNext && typeof observerOrNext === "object") {
-      const observer = observerOrNext;
-      nextFn = observer.next?.bind(observer);
-      errorFn = observer.error?.bind(observer);
-      completeFn = observer.complete?.bind(observer);
-    }
-    if (this.__isAsync) {
-      errorFn = this.wrapInTimeout(errorFn);
-      if (nextFn) {
-        nextFn = this.wrapInTimeout(nextFn);
-      }
-      if (completeFn) {
-        completeFn = this.wrapInTimeout(completeFn);
-      }
-    }
-    const sink = super.subscribe({
-      next: nextFn,
-      error: errorFn,
-      complete: completeFn
-    });
-    if (observerOrNext instanceof Subscription) {
-      observerOrNext.add(sink);
-    }
-    return sink;
-  }
-  wrapInTimeout(fn) {
-    return (value) => {
-      const taskId = this.pendingTasks?.add();
-      setTimeout(() => {
-        fn(value);
-        if (taskId !== void 0) {
-          this.pendingTasks?.remove(taskId);
-        }
-      });
-    };
-  }
-};
-var EventEmitter = EventEmitter_;
 function symbolIterator() {
   return this._results[Symbol.iterator]();
 }
-var _QueryList = class _QueryList {
+var QueryList = class _QueryList {
+  static {
+    Symbol.iterator;
+  }
   /**
    * Returns `Observable` of `QueryList` notifying the subscriber of changes.
    */
@@ -8560,8 +8940,6 @@ var _QueryList = class _QueryList {
     }
   }
 };
-Symbol.iterator;
-var QueryList = _QueryList;
 var SKIP_HYDRATION_ATTR_NAME = "ngSkipHydration";
 var SKIP_HYDRATION_ATTR_NAME_LOWER_CASE = "ngskiphydration";
 function hasSkipHydrationAttrOnTNode(tNode) {
@@ -8594,6 +8972,9 @@ function isInSkipHydrationBlock(tNode) {
     currentTNode = currentTNode.parent;
   }
   return false;
+}
+function isI18nInSkipHydrationBlock(parentTNode) {
+  return hasInSkipHydrationBlockFlag(parentTNode) || hasSkipHydrationAttrOnTNode(parentTNode) || isInSkipHydrationBlock(parentTNode);
 }
 var TRACKED_LVIEWS = /* @__PURE__ */ new Map();
 var uniqueIdCounter = 0;
@@ -9089,10 +9470,17 @@ function initTransferState() {
   }
   return transferState;
 }
-var _TransferState = class _TransferState {
+var TransferState = class _TransferState {
   constructor() {
     this.store = {};
     this.onSerializeCallbacks = {};
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _TransferState,
+      providedIn: "root",
+      factory: initTransferState
+    });
   }
   /**
    * Get the value corresponding to a key. Return `defaultValue` if key is not found.
@@ -9146,12 +9534,6 @@ var _TransferState = class _TransferState {
     return JSON.stringify(this.store).replace(/</g, "\\u003C");
   }
 };
-_TransferState.ɵprov = ɵɵdefineInjectable({
-  token: _TransferState,
-  providedIn: "root",
-  factory: initTransferState
-});
-var TransferState = _TransferState;
 function retrieveTransferredState(doc, appId) {
   const script = doc.getElementById(appId + "-state");
   if (script?.textContent) {
@@ -9514,7 +9896,7 @@ var DOMParserHelper = class {
       if (body === null) {
         return this.inertDocumentHelper.getInertBodyElement(html);
       }
-      body.removeChild(body.firstChild);
+      body.firstChild?.remove();
       return body;
     } catch {
       return null;
@@ -9717,7 +10099,7 @@ function _sanitizeHtml(defaultDoc, unsafeHtmlInput) {
     if (inertBodyElement) {
       const parent = getTemplateContent(inertBodyElement) || inertBodyElement;
       while (parent.firstChild) {
-        parent.removeChild(parent.firstChild);
+        parent.firstChild.remove();
       }
     }
   }
@@ -10163,7 +10545,7 @@ function addViewToDOM(tView, parentTNode, renderer, lView, parentNativeNode, bef
 }
 function detachViewFromDOM(tView, lView) {
   lView[ENVIRONMENT].changeDetectionScheduler?.notify(
-    8
+    9
     /* NotificationSource.ViewDetachedFromDOM */
   );
   applyView(tView, lView, lView[RENDERER], 2, null, null);
@@ -10431,9 +10813,6 @@ function nativeAppendOrInsertBefore(renderer, parent, child, beforeNode, isMove)
     nativeAppendChild(renderer, parent, child);
   }
 }
-function nativeRemoveChild(renderer, parent, child, isHostElement) {
-  renderer.removeChild(parent, child, isHostElement);
-}
 function nativeParentNode(renderer, node) {
   return renderer.parentNode(node);
 }
@@ -10475,8 +10854,8 @@ function getFirstNativeNode(lView, tNode) {
   if (tNode !== null) {
     ngDevMode && assertTNodeType(
       tNode,
-      3 | 12 | 32 | 16
-      /* TNodeType.Projection */
+      3 | 12 | 32 | 16 | 128
+      /* TNodeType.LetDeclaration */
     );
     const tNodeType = tNode.type;
     if (tNodeType & 3) {
@@ -10495,6 +10874,8 @@ function getFirstNativeNode(lView, tNode) {
           return unwrapRNode(rNodeOrLContainer);
         }
       }
+    } else if (tNodeType & 128) {
+      return getFirstNativeNode(lView, tNode.next);
     } else if (tNodeType & 32) {
       let nextRNode = icuContainerIterate(tNode, lView);
       let rNode = nextRNode();
@@ -10538,10 +10919,7 @@ function getBeforeNodeForView(viewIndexInContainer, lContainer) {
 }
 function nativeRemoveNode(renderer, rNode, isHostElement) {
   ngDevMode && ngDevMode.rendererRemoveNode++;
-  const nativeParent = nativeParentNode(renderer, rNode);
-  if (nativeParent) {
-    nativeRemoveChild(renderer, nativeParent, rNode, isHostElement);
-  }
+  renderer.removeChild(null, rNode, isHostElement);
 }
 function clearElementContents(rElement) {
   rElement.textContent = "";
@@ -12393,10 +12771,11 @@ var ViewRef$1 = class {
     updateAncestorTraversalFlagsOnAttach(this._lView);
   }
 };
-var _TemplateRef = class _TemplateRef {
+var TemplateRef = class {
+  static {
+    this.__NG_ELEMENT_ID__ = injectTemplateRef;
+  }
 };
-_TemplateRef.__NG_ELEMENT_ID__ = injectTemplateRef;
-var TemplateRef = _TemplateRef;
 var ViewEngineTemplateRef = TemplateRef;
 var R3TemplateRef = class TemplateRef2 extends ViewEngineTemplateRef {
   constructor(_declarationLView, _declarationTContainer, elementRef) {
@@ -13155,6 +13534,10 @@ function trySerializeI18nBlock(lView, index, context2) {
   if (!tI18n || !tI18n.ast) {
     return null;
   }
+  const parentTNode = tView.data[tI18n.parentTNodeIndex];
+  if (parentTNode && isI18nInSkipHydrationBlock(parentTNode)) {
+    return null;
+  }
   const serializedI18nBlock = {
     caseQueue: [],
     disconnectedNodes: /* @__PURE__ */ new Set(),
@@ -13255,11 +13638,11 @@ function forkHydrationState(state, nextNode) {
   };
 }
 function prepareI18nBlockForHydrationImpl(lView, index, parentTNode, subTemplateIndex) {
-  if (!isI18nHydrationSupportEnabled()) {
-    return;
-  }
   const hydrationInfo = lView[HYDRATION];
   if (!hydrationInfo) {
+    return;
+  }
+  if (!isI18nHydrationSupportEnabled() || parentTNode && (isI18nInSkipHydrationBlock(parentTNode) || isDisconnectedNode$1(hydrationInfo, parentTNode.index - HEADER_OFFSET))) {
     return;
   }
   const tView = lView[TVIEW];
@@ -13441,6 +13824,10 @@ function removeDehydratedView(dehydratedView, renderer) {
 }
 function cleanupLContainer(lContainer) {
   removeDehydratedViews(lContainer);
+  const hostLView = lContainer[HOST];
+  if (isLView(hostLView)) {
+    cleanupLView(hostLView);
+  }
   for (let i = CONTAINER_HEADER_OFFSET; i < lContainer.length; i++) {
     cleanupLView(lContainer[i]);
   }
@@ -13465,8 +13852,6 @@ function cleanupDehydratedViews(appRef) {
       if (isLView(lNode)) {
         cleanupLView(lNode);
       } else {
-        const componentLView = lNode[HOST];
-        cleanupLView(componentLView);
         cleanupLContainer(lNode);
       }
       ngDevMode && ngDevMode.dehydratedViewsCleanupRuns++;
@@ -13521,6 +13906,7 @@ var PROVIDED_ZONELESS = new InjectionToken(typeof ngDevMode === "undefined" || n
   factory: () => false
 });
 var ZONELESS_SCHEDULER_DISABLED = new InjectionToken(typeof ngDevMode === "undefined" || ngDevMode ? "scheduler disabled" : "");
+var SCHEDULE_IN_ROOT_ZONE = new InjectionToken(typeof ngDevMode === "undefined" || ngDevMode ? "run changes outside zone in root" : "");
 var ComponentRef$1 = class {
 };
 var ComponentFactory$1 = class {
@@ -13536,586 +13922,36 @@ var _NullComponentFactoryResolver = class {
     throw noComponentFactoryError(component);
   }
 };
-var _ComponentFactoryResolver$1 = class _ComponentFactoryResolver$1 {
+var ComponentFactoryResolver$1 = class {
+  static {
+    this.NULL = new _NullComponentFactoryResolver();
+  }
 };
-_ComponentFactoryResolver$1.NULL = new _NullComponentFactoryResolver();
-var ComponentFactoryResolver$1 = _ComponentFactoryResolver$1;
 var RendererFactory2 = class {
 };
-var _Renderer2 = class _Renderer2 {
+var Renderer2 = class {
   constructor() {
     this.destroyNode = null;
   }
+  static {
+    this.__NG_ELEMENT_ID__ = () => injectRenderer2();
+  }
 };
-_Renderer2.__NG_ELEMENT_ID__ = () => injectRenderer2();
-var Renderer2 = _Renderer2;
 function injectRenderer2() {
   const lView = getLView();
   const tNode = getCurrentTNode();
   const nodeAtIndex = getComponentLViewByIndex(tNode.index, lView);
   return (isLView(nodeAtIndex) ? nodeAtIndex : lView)[RENDERER];
 }
-var _Sanitizer = class _Sanitizer {
-};
-_Sanitizer.ɵprov = ɵɵdefineInjectable({
-  token: _Sanitizer,
-  providedIn: "root",
-  factory: () => null
-});
-var Sanitizer = _Sanitizer;
-function assertNotInReactiveContext(debugFn, extraContext) {
-  if (getActiveConsumer() !== null) {
-    throw new RuntimeError(-602, ngDevMode && `${debugFn.name}() cannot be called from within a reactive context.${extraContext ? ` ${extraContext}` : ""}`);
-  }
-}
-var markedFeatures = /* @__PURE__ */ new Set();
-function performanceMarkFeature(feature) {
-  if (markedFeatures.has(feature)) {
-    return;
-  }
-  markedFeatures.add(feature);
-  performance?.mark?.("mark_feature_usage", {
-    detail: {
-      feature
-    }
-  });
-}
-function scheduleCallbackWithRafRace(callback) {
-  let executeCallback = true;
-  setTimeout(() => {
-    if (!executeCallback) {
-      return;
-    }
-    executeCallback = false;
-    callback();
-  });
-  if (typeof _global["requestAnimationFrame"] === "function") {
-    _global["requestAnimationFrame"](() => {
-      if (!executeCallback) {
-        return;
-      }
-      executeCallback = false;
-      callback();
+var Sanitizer = class _Sanitizer {
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _Sanitizer,
+      providedIn: "root",
+      factory: () => null
     });
   }
-  return () => {
-    executeCallback = false;
-  };
-}
-function scheduleCallbackWithMicrotask(callback) {
-  let executeCallback = true;
-  queueMicrotask(() => {
-    if (executeCallback) {
-      callback();
-    }
-  });
-  return () => {
-    executeCallback = false;
-  };
-}
-function noop2(...args) {
-}
-var AsyncStackTaggingZoneSpec = class {
-  constructor(namePrefix, consoleAsyncStackTaggingImpl = console) {
-    this.name = "asyncStackTagging for " + namePrefix;
-    this.createTask = consoleAsyncStackTaggingImpl?.createTask ?? (() => null);
-  }
-  onScheduleTask(delegate, _current, target, task) {
-    task.consoleTask = this.createTask(`Zone - ${task.source || task.type}`);
-    return delegate.scheduleTask(target, task);
-  }
-  onInvokeTask(delegate, _currentZone, targetZone, task, applyThis, applyArgs) {
-    let ret;
-    if (task.consoleTask) {
-      ret = task.consoleTask.run(() => delegate.invokeTask(targetZone, task, applyThis, applyArgs));
-    } else {
-      ret = delegate.invokeTask(targetZone, task, applyThis, applyArgs);
-    }
-    return ret;
-  }
 };
-var NgZone = class _NgZone {
-  constructor({
-    enableLongStackTrace = false,
-    shouldCoalesceEventChangeDetection = false,
-    shouldCoalesceRunChangeDetection = false
-  }) {
-    this.hasPendingMacrotasks = false;
-    this.hasPendingMicrotasks = false;
-    this.isStable = true;
-    this.onUnstable = new EventEmitter(false);
-    this.onMicrotaskEmpty = new EventEmitter(false);
-    this.onStable = new EventEmitter(false);
-    this.onError = new EventEmitter(false);
-    if (typeof Zone == "undefined") {
-      throw new RuntimeError(908, ngDevMode && `In this configuration Angular requires Zone.js`);
-    }
-    Zone.assertZonePatched();
-    const self = this;
-    self._nesting = 0;
-    self._outer = self._inner = Zone.current;
-    if (ngDevMode) {
-      self._inner = self._inner.fork(new AsyncStackTaggingZoneSpec("Angular"));
-    }
-    if (Zone["TaskTrackingZoneSpec"]) {
-      self._inner = self._inner.fork(new Zone["TaskTrackingZoneSpec"]());
-    }
-    if (enableLongStackTrace && Zone["longStackTraceZoneSpec"]) {
-      self._inner = self._inner.fork(Zone["longStackTraceZoneSpec"]);
-    }
-    self.shouldCoalesceEventChangeDetection = !shouldCoalesceRunChangeDetection && shouldCoalesceEventChangeDetection;
-    self.shouldCoalesceRunChangeDetection = shouldCoalesceRunChangeDetection;
-    self.callbackScheduled = false;
-    forkInnerZoneWithAngularBehavior(self);
-  }
-  /**
-    This method checks whether the method call happens within an Angular Zone instance.
-  */
-  static isInAngularZone() {
-    return typeof Zone !== "undefined" && Zone.current.get("isAngularZone") === true;
-  }
-  /**
-    Assures that the method is called within the Angular Zone, otherwise throws an error.
-  */
-  static assertInAngularZone() {
-    if (!_NgZone.isInAngularZone()) {
-      throw new RuntimeError(909, ngDevMode && "Expected to be in Angular Zone, but it is not!");
-    }
-  }
-  /**
-    Assures that the method is called outside of the Angular Zone, otherwise throws an error.
-  */
-  static assertNotInAngularZone() {
-    if (_NgZone.isInAngularZone()) {
-      throw new RuntimeError(909, ngDevMode && "Expected to not be in Angular Zone, but it is!");
-    }
-  }
-  /**
-   * Executes the `fn` function synchronously within the Angular zone and returns value returned by
-   * the function.
-   *
-   * Running functions via `run` allows you to reenter Angular zone from a task that was executed
-   * outside of the Angular zone (typically started via {@link #runOutsideAngular}).
-   *
-   * Any future tasks or microtasks scheduled from within this function will continue executing from
-   * within the Angular zone.
-   *
-   * If a synchronous error happens it will be rethrown and not reported via `onError`.
-   */
-  run(fn, applyThis, applyArgs) {
-    return this._inner.run(fn, applyThis, applyArgs);
-  }
-  /**
-   * Executes the `fn` function synchronously within the Angular zone as a task and returns value
-   * returned by the function.
-   *
-   * Running functions via `run` allows you to reenter Angular zone from a task that was executed
-   * outside of the Angular zone (typically started via {@link #runOutsideAngular}).
-   *
-   * Any future tasks or microtasks scheduled from within this function will continue executing from
-   * within the Angular zone.
-   *
-   * If a synchronous error happens it will be rethrown and not reported via `onError`.
-   */
-  runTask(fn, applyThis, applyArgs, name) {
-    const zone = this._inner;
-    const task = zone.scheduleEventTask("NgZoneEvent: " + name, fn, EMPTY_PAYLOAD, noop2, noop2);
-    try {
-      return zone.runTask(task, applyThis, applyArgs);
-    } finally {
-      zone.cancelTask(task);
-    }
-  }
-  /**
-   * Same as `run`, except that synchronous errors are caught and forwarded via `onError` and not
-   * rethrown.
-   */
-  runGuarded(fn, applyThis, applyArgs) {
-    return this._inner.runGuarded(fn, applyThis, applyArgs);
-  }
-  /**
-   * Executes the `fn` function synchronously in Angular's parent zone and returns value returned by
-   * the function.
-   *
-   * Running functions via {@link #runOutsideAngular} allows you to escape Angular's zone and do
-   * work that
-   * doesn't trigger Angular change-detection or is subject to Angular's error handling.
-   *
-   * Any future tasks or microtasks scheduled from within this function will continue executing from
-   * outside of the Angular zone.
-   *
-   * Use {@link #run} to reenter the Angular zone and do work that updates the application model.
-   */
-  runOutsideAngular(fn) {
-    return this._outer.run(fn);
-  }
-};
-var EMPTY_PAYLOAD = {};
-function checkStable(zone) {
-  if (zone._nesting == 0 && !zone.hasPendingMicrotasks && !zone.isStable) {
-    try {
-      zone._nesting++;
-      zone.onMicrotaskEmpty.emit(null);
-    } finally {
-      zone._nesting--;
-      if (!zone.hasPendingMicrotasks) {
-        try {
-          zone.runOutsideAngular(() => zone.onStable.emit(null));
-        } finally {
-          zone.isStable = true;
-        }
-      }
-    }
-  }
-}
-function delayChangeDetectionForEvents(zone) {
-  if (zone.isCheckStableRunning || zone.callbackScheduled) {
-    return;
-  }
-  zone.callbackScheduled = true;
-  Zone.root.run(() => {
-    scheduleCallbackWithRafRace(() => {
-      zone.callbackScheduled = false;
-      updateMicroTaskStatus(zone);
-      zone.isCheckStableRunning = true;
-      checkStable(zone);
-      zone.isCheckStableRunning = false;
-    });
-  });
-  updateMicroTaskStatus(zone);
-}
-function forkInnerZoneWithAngularBehavior(zone) {
-  const delayChangeDetectionForEventsDelegate = () => {
-    delayChangeDetectionForEvents(zone);
-  };
-  zone._inner = zone._inner.fork({
-    name: "angular",
-    properties: {
-      "isAngularZone": true
-    },
-    onInvokeTask: (delegate, current, target, task, applyThis, applyArgs) => {
-      if (shouldBeIgnoredByZone(applyArgs)) {
-        return delegate.invokeTask(target, task, applyThis, applyArgs);
-      }
-      try {
-        onEnter(zone);
-        return delegate.invokeTask(target, task, applyThis, applyArgs);
-      } finally {
-        if (zone.shouldCoalesceEventChangeDetection && task.type === "eventTask" || zone.shouldCoalesceRunChangeDetection) {
-          delayChangeDetectionForEventsDelegate();
-        }
-        onLeave(zone);
-      }
-    },
-    onInvoke: (delegate, current, target, callback, applyThis, applyArgs, source) => {
-      try {
-        onEnter(zone);
-        return delegate.invoke(target, callback, applyThis, applyArgs, source);
-      } finally {
-        if (zone.shouldCoalesceRunChangeDetection && // Do not delay change detection when the task is the scheduler's tick.
-        // We need to synchronously trigger the stability logic so that the
-        // zone-based scheduler can prevent a duplicate ApplicationRef.tick
-        // by first checking if the scheduler tick is running. This does seem a bit roundabout,
-        // but we _do_ still want to trigger all the correct events when we exit the zone.run
-        // (`onMicrotaskEmpty` and `onStable` _should_ emit; developers can have code which
-        // relies on these events happening after change detection runs).
-        // Note: `zone.callbackScheduled` is already in delayChangeDetectionForEventsDelegate
-        // but is added here as well to prevent reads of applyArgs when not necessary
-        !zone.callbackScheduled && !isSchedulerTick(applyArgs)) {
-          delayChangeDetectionForEventsDelegate();
-        }
-        onLeave(zone);
-      }
-    },
-    onHasTask: (delegate, current, target, hasTaskState) => {
-      delegate.hasTask(target, hasTaskState);
-      if (current === target) {
-        if (hasTaskState.change == "microTask") {
-          zone._hasPendingMicrotasks = hasTaskState.microTask;
-          updateMicroTaskStatus(zone);
-          checkStable(zone);
-        } else if (hasTaskState.change == "macroTask") {
-          zone.hasPendingMacrotasks = hasTaskState.macroTask;
-        }
-      }
-    },
-    onHandleError: (delegate, current, target, error) => {
-      delegate.handleError(target, error);
-      zone.runOutsideAngular(() => zone.onError.emit(error));
-      return false;
-    }
-  });
-}
-function updateMicroTaskStatus(zone) {
-  if (zone._hasPendingMicrotasks || (zone.shouldCoalesceEventChangeDetection || zone.shouldCoalesceRunChangeDetection) && zone.callbackScheduled === true) {
-    zone.hasPendingMicrotasks = true;
-  } else {
-    zone.hasPendingMicrotasks = false;
-  }
-}
-function onEnter(zone) {
-  zone._nesting++;
-  if (zone.isStable) {
-    zone.isStable = false;
-    zone.onUnstable.emit(null);
-  }
-}
-function onLeave(zone) {
-  zone._nesting--;
-  checkStable(zone);
-}
-var NoopNgZone = class {
-  constructor() {
-    this.hasPendingMicrotasks = false;
-    this.hasPendingMacrotasks = false;
-    this.isStable = true;
-    this.onUnstable = new EventEmitter();
-    this.onMicrotaskEmpty = new EventEmitter();
-    this.onStable = new EventEmitter();
-    this.onError = new EventEmitter();
-  }
-  run(fn, applyThis, applyArgs) {
-    return fn.apply(applyThis, applyArgs);
-  }
-  runGuarded(fn, applyThis, applyArgs) {
-    return fn.apply(applyThis, applyArgs);
-  }
-  runOutsideAngular(fn) {
-    return fn();
-  }
-  runTask(fn, applyThis, applyArgs, name) {
-    return fn.apply(applyThis, applyArgs);
-  }
-};
-function shouldBeIgnoredByZone(applyArgs) {
-  return hasApplyArgsData(applyArgs, "__ignore_ng_zone__");
-}
-function isSchedulerTick(applyArgs) {
-  return hasApplyArgsData(applyArgs, "__scheduler_tick__");
-}
-function hasApplyArgsData(applyArgs, key) {
-  if (!Array.isArray(applyArgs)) {
-    return false;
-  }
-  if (applyArgs.length !== 1) {
-    return false;
-  }
-  return applyArgs[0]?.data?.[key] === true;
-}
-function getNgZone(ngZoneToUse = "zone.js", options) {
-  if (ngZoneToUse === "noop") {
-    return new NoopNgZone();
-  }
-  if (ngZoneToUse === "zone.js") {
-    return new NgZone(options);
-  }
-  return ngZoneToUse;
-}
-var AfterRenderPhase;
-(function(AfterRenderPhase2) {
-  AfterRenderPhase2[AfterRenderPhase2["EarlyRead"] = 0] = "EarlyRead";
-  AfterRenderPhase2[AfterRenderPhase2["Write"] = 1] = "Write";
-  AfterRenderPhase2[AfterRenderPhase2["MixedReadWrite"] = 2] = "MixedReadWrite";
-  AfterRenderPhase2[AfterRenderPhase2["Read"] = 3] = "Read";
-})(AfterRenderPhase || (AfterRenderPhase = {}));
-var NOOP_AFTER_RENDER_REF = {
-  destroy() {
-  }
-};
-function internalAfterNextRender(callback, options) {
-  const injector = options?.injector ?? inject(Injector);
-  if (!options?.runOnServer && !isPlatformBrowser(injector)) return;
-  const afterRenderEventManager = injector.get(AfterRenderEventManager);
-  afterRenderEventManager.internalCallbacks.push(callback);
-}
-function afterRender(callbackOrSpec, options) {
-  ngDevMode && assertNotInReactiveContext(afterRender, "Call `afterRender` outside of a reactive context. For example, schedule the render callback inside the component constructor`.");
-  !options && assertInInjectionContext(afterRender);
-  const injector = options?.injector ?? inject(Injector);
-  if (!isPlatformBrowser(injector)) {
-    return NOOP_AFTER_RENDER_REF;
-  }
-  performanceMarkFeature("NgAfterRender");
-  return afterRenderImpl(
-    callbackOrSpec,
-    injector,
-    /* once */
-    false,
-    options?.phase ?? AfterRenderPhase.MixedReadWrite
-  );
-}
-function afterNextRender(callbackOrSpec, options) {
-  !options && assertInInjectionContext(afterNextRender);
-  const injector = options?.injector ?? inject(Injector);
-  if (!isPlatformBrowser(injector)) {
-    return NOOP_AFTER_RENDER_REF;
-  }
-  performanceMarkFeature("NgAfterNextRender");
-  return afterRenderImpl(
-    callbackOrSpec,
-    injector,
-    /* once */
-    true,
-    options?.phase ?? AfterRenderPhase.MixedReadWrite
-  );
-}
-function getSpec(callbackOrSpec, phase) {
-  if (callbackOrSpec instanceof Function) {
-    switch (phase) {
-      case AfterRenderPhase.EarlyRead:
-        return {
-          earlyRead: callbackOrSpec
-        };
-      case AfterRenderPhase.Write:
-        return {
-          write: callbackOrSpec
-        };
-      case AfterRenderPhase.MixedReadWrite:
-        return {
-          mixedReadWrite: callbackOrSpec
-        };
-      case AfterRenderPhase.Read:
-        return {
-          read: callbackOrSpec
-        };
-    }
-  }
-  return callbackOrSpec;
-}
-function afterRenderImpl(callbackOrSpec, injector, once, phase) {
-  const spec = getSpec(callbackOrSpec, phase);
-  const afterRenderEventManager = injector.get(AfterRenderEventManager);
-  const callbackHandler = afterRenderEventManager.handler ??= new AfterRenderCallbackHandlerImpl();
-  const pipelinedArgs = [];
-  const instances = [];
-  const destroy = () => {
-    for (const instance of instances) {
-      callbackHandler.unregister(instance);
-    }
-    unregisterFn();
-  };
-  const unregisterFn = injector.get(DestroyRef).onDestroy(destroy);
-  let callbacksLeftToRun = 0;
-  const registerCallback = (phase2, phaseCallback) => {
-    if (!phaseCallback) {
-      return;
-    }
-    const callback = once ? (...args) => {
-      callbacksLeftToRun--;
-      if (callbacksLeftToRun < 1) {
-        destroy();
-      }
-      return phaseCallback(...args);
-    } : phaseCallback;
-    const instance = runInInjectionContext(injector, () => new AfterRenderCallback(phase2, pipelinedArgs, callback));
-    callbackHandler.register(instance);
-    instances.push(instance);
-    callbacksLeftToRun++;
-  };
-  registerCallback(AfterRenderPhase.EarlyRead, spec.earlyRead);
-  registerCallback(AfterRenderPhase.Write, spec.write);
-  registerCallback(AfterRenderPhase.MixedReadWrite, spec.mixedReadWrite);
-  registerCallback(AfterRenderPhase.Read, spec.read);
-  return {
-    destroy
-  };
-}
-var AfterRenderCallback = class {
-  constructor(phase, pipelinedArgs, callbackFn) {
-    this.phase = phase;
-    this.pipelinedArgs = pipelinedArgs;
-    this.callbackFn = callbackFn;
-    this.zone = inject(NgZone);
-    this.errorHandler = inject(ErrorHandler, {
-      optional: true
-    });
-    inject(ChangeDetectionScheduler, {
-      optional: true
-    })?.notify(
-      6
-      /* NotificationSource.NewRenderHook */
-    );
-  }
-  invoke() {
-    try {
-      const result = this.zone.runOutsideAngular(() => this.callbackFn.apply(null, this.pipelinedArgs));
-      this.pipelinedArgs.splice(0, this.pipelinedArgs.length, result);
-    } catch (err) {
-      this.errorHandler?.handleError(err);
-    }
-  }
-};
-var AfterRenderCallbackHandlerImpl = class {
-  constructor() {
-    this.executingCallbacks = false;
-    this.buckets = {
-      // Note: the order of these keys controls the order the phases are run.
-      [AfterRenderPhase.EarlyRead]: /* @__PURE__ */ new Set(),
-      [AfterRenderPhase.Write]: /* @__PURE__ */ new Set(),
-      [AfterRenderPhase.MixedReadWrite]: /* @__PURE__ */ new Set(),
-      [AfterRenderPhase.Read]: /* @__PURE__ */ new Set()
-    };
-    this.deferredCallbacks = /* @__PURE__ */ new Set();
-  }
-  register(callback) {
-    const target = this.executingCallbacks ? this.deferredCallbacks : this.buckets[callback.phase];
-    target.add(callback);
-  }
-  unregister(callback) {
-    this.buckets[callback.phase].delete(callback);
-    this.deferredCallbacks.delete(callback);
-  }
-  execute() {
-    this.executingCallbacks = true;
-    for (const bucket of Object.values(this.buckets)) {
-      for (const callback of bucket) {
-        callback.invoke();
-      }
-    }
-    this.executingCallbacks = false;
-    for (const callback of this.deferredCallbacks) {
-      this.buckets[callback.phase].add(callback);
-    }
-    this.deferredCallbacks.clear();
-  }
-  destroy() {
-    for (const bucket of Object.values(this.buckets)) {
-      bucket.clear();
-    }
-    this.deferredCallbacks.clear();
-  }
-};
-var _AfterRenderEventManager = class _AfterRenderEventManager {
-  constructor() {
-    this.handler = null;
-    this.internalCallbacks = [];
-  }
-  /**
-   * Executes internal and user-provided callbacks.
-   */
-  execute() {
-    this.executeInternalCallbacks();
-    this.handler?.execute();
-  }
-  executeInternalCallbacks() {
-    const callbacks = [...this.internalCallbacks];
-    this.internalCallbacks.length = 0;
-    for (const callback of callbacks) {
-      callback();
-    }
-  }
-  ngOnDestroy() {
-    this.handler?.destroy();
-    this.handler = null;
-    this.internalCallbacks.length = 0;
-  }
-};
-_AfterRenderEventManager.ɵprov = ɵɵdefineInjectable({
-  token: _AfterRenderEventManager,
-  providedIn: "root",
-  factory: () => new _AfterRenderEventManager()
-});
-var AfterRenderEventManager = _AfterRenderEventManager;
 function isModuleWithProviders(value) {
   return value.ngModule !== void 0;
 }
@@ -14485,14 +14321,12 @@ var ComponentFactory = class extends ComponentFactory$1 {
         throw new RuntimeError(407, ngDevMode && "Angular was not able to inject a renderer (RendererFactory2). Likely this is due to a broken DI hierarchy. Make sure that any injector used to create this component has a correct parent.");
       }
       const sanitizer = rootViewInjector.get(Sanitizer, null);
-      const afterRenderEventManager = rootViewInjector.get(AfterRenderEventManager, null);
       const changeDetectionScheduler = rootViewInjector.get(ChangeDetectionScheduler, null);
       const environment = {
         rendererFactory,
         sanitizer,
         // We don't use inline effects (yet).
         inlineEffectRunner: null,
-        afterRenderEventManager,
         changeDetectionScheduler
       };
       const hostRenderer = rendererFactory.createRenderer(null, this.componentDef);
@@ -14518,6 +14352,7 @@ var ComponentFactory = class extends ComponentFactory$1 {
       enterView(rootLView);
       let component;
       let tElementNode;
+      let componentView = null;
       try {
         const rootComponentDef = this.componentDef;
         let rootDirectives;
@@ -14532,7 +14367,7 @@ var ComponentFactory = class extends ComponentFactory$1 {
           rootDirectives = [rootComponentDef];
         }
         const hostTNode = createRootComponentTNode(rootLView, hostRNode);
-        const componentView = createRootComponentView(hostTNode, hostRNode, rootComponentDef, rootDirectives, rootLView, environment, hostRenderer);
+        componentView = createRootComponentView(hostTNode, hostRNode, rootComponentDef, rootDirectives, rootLView, environment, hostRenderer);
         tElementNode = getTNode(rootTView, HEADER_OFFSET);
         if (hostRNode) {
           setRootNodeAttributes(hostRenderer, rootComponentDef, hostRNode, rootSelectorOrNode);
@@ -14542,6 +14377,12 @@ var ComponentFactory = class extends ComponentFactory$1 {
         }
         component = createRootComponent(componentView, rootComponentDef, rootDirectives, hostDirectiveDefs, rootLView, [LifecycleHooksFeature]);
         renderView(rootTView, rootLView, null);
+      } catch (e) {
+        if (componentView !== null) {
+          unregisterLView(componentView);
+        }
+        unregisterLView(rootLView);
+        throw e;
       } finally {
         leaveView();
       }
@@ -14670,7 +14511,7 @@ function createRootComponent(componentView, rootComponentDef, rootDirectives, ho
 }
 function setRootNodeAttributes(hostRenderer, componentDef, hostRNode, rootSelectorOrNode) {
   if (rootSelectorOrNode) {
-    setUpAttributes(hostRenderer, hostRNode, ["ng-version", "18.1.2"]);
+    setUpAttributes(hostRenderer, hostRNode, ["ng-version", "18.2.6"]);
   } else {
     const {
       attrs,
@@ -14696,10 +14537,11 @@ function LifecycleHooksFeature() {
   ngDevMode && assertDefined(tNode, "TNode is required");
   registerPostOrderHooks(getLView()[TVIEW], tNode);
 }
-var _ViewContainerRef = class _ViewContainerRef {
+var ViewContainerRef = class {
+  static {
+    this.__NG_ELEMENT_ID__ = injectViewContainerRef;
+  }
 };
-_ViewContainerRef.__NG_ELEMENT_ID__ = injectViewContainerRef;
-var ViewContainerRef = _ViewContainerRef;
 function injectViewContainerRef() {
   const previousTNode = getCurrentTNode();
   return createContainerRef(previousTNode, getLView());
@@ -15283,6 +15125,18 @@ function getQueryResults(lView, queryIndex) {
   const tView = lView[TVIEW];
   const tQuery = getTQuery(tView, queryIndex);
   return tQuery.crossesNgTemplate ? collectQueryResults(tView, lView, queryIndex, []) : materializeViewResults(tView, lView, tQuery, queryIndex);
+}
+var markedFeatures = /* @__PURE__ */ new Set();
+function performanceMarkFeature(feature) {
+  if (markedFeatures.has(feature)) {
+    return;
+  }
+  markedFeatures.add(feature);
+  performance?.mark?.("mark_feature_usage", {
+    detail: {
+      feature
+    }
+  });
 }
 function isSignal(value) {
   return typeof value === "function" && value[SIGNAL] !== void 0;
@@ -15883,8 +15737,9 @@ function createNgModule(ngModule, parentInjector) {
 }
 var createNgModuleRef = createNgModule;
 var NgModuleRef = class extends NgModuleRef$1 {
-  constructor(ngModuleType, _parent, additionalProviders) {
+  constructor(ngModuleType, _parent, additionalProviders, runInjectorInitializers = true) {
     super();
+    this.ngModuleType = ngModuleType;
     this._parent = _parent;
     this._bootstrapComponents = [];
     this.destroyCbs = [];
@@ -15899,8 +15754,13 @@ var NgModuleRef = class extends NgModuleRef$1 {
       provide: ComponentFactoryResolver$1,
       useValue: this.componentFactoryResolver
     }, ...additionalProviders], stringify(ngModuleType), /* @__PURE__ */ new Set(["environment"]));
+    if (runInjectorInitializers) {
+      this.resolveInjectorInitializers();
+    }
+  }
+  resolveInjectorInitializers() {
     this._r3Injector.resolveInjectorInitializers();
-    this.instance = this._r3Injector.get(ngModuleType);
+    this.instance = this._r3Injector.get(this.ngModuleType);
   }
   get injector() {
     return this._r3Injector;
@@ -15927,7 +15787,7 @@ var NgModuleFactory = class extends NgModuleFactory$1 {
   }
 };
 function createNgModuleRefWithProviders(moduleType, parentInjector, additionalProviders) {
-  return new NgModuleRef(moduleType, parentInjector, additionalProviders);
+  return new NgModuleRef(moduleType, parentInjector, additionalProviders, false);
 }
 var EnvironmentNgModuleRefAdapter = class extends NgModuleRef$1 {
   constructor(config2) {
@@ -15962,7 +15822,7 @@ function createEnvironmentInjector(providers, parent, debugName = null) {
   });
   return adapter.injector;
 }
-var _CachedInjectorService = class _CachedInjectorService {
+var CachedInjectorService = class _CachedInjectorService {
   constructor() {
     this.cachedInjectors = /* @__PURE__ */ new Map();
   }
@@ -15984,13 +15844,14 @@ var _CachedInjectorService = class _CachedInjectorService {
       this.cachedInjectors.clear();
     }
   }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _CachedInjectorService,
+      providedIn: "environment",
+      factory: () => new _CachedInjectorService()
+    });
+  }
 };
-_CachedInjectorService.ɵprov = ɵɵdefineInjectable({
-  token: _CachedInjectorService,
-  providedIn: "environment",
-  factory: () => new _CachedInjectorService()
-});
-var CachedInjectorService = _CachedInjectorService;
 function isListLikeIterable(obj) {
   if (!isJsObject(obj)) return false;
   return Array.isArray(obj) || !(obj instanceof Map) && // JS Map are iterables but return entries as [k, v]
@@ -16221,6 +16082,183 @@ function invokeAllTriggerCleanupFns(lDetails) {
   invokeTriggerCleanupFns(1, lDetails);
   invokeTriggerCleanupFns(0, lDetails);
 }
+function assertNotInReactiveContext(debugFn, extraContext) {
+  if (getActiveConsumer() !== null) {
+    throw new RuntimeError(-602, ngDevMode && `${debugFn.name}() cannot be called from within a reactive context.${extraContext ? ` ${extraContext}` : ""}`);
+  }
+}
+var AfterRenderPhase;
+(function(AfterRenderPhase2) {
+  AfterRenderPhase2[AfterRenderPhase2["EarlyRead"] = 0] = "EarlyRead";
+  AfterRenderPhase2[AfterRenderPhase2["Write"] = 1] = "Write";
+  AfterRenderPhase2[AfterRenderPhase2["MixedReadWrite"] = 2] = "MixedReadWrite";
+  AfterRenderPhase2[AfterRenderPhase2["Read"] = 3] = "Read";
+})(AfterRenderPhase || (AfterRenderPhase = {}));
+var AfterRenderManager = class _AfterRenderManager {
+  constructor() {
+    this.impl = null;
+  }
+  execute() {
+    this.impl?.execute();
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _AfterRenderManager,
+      providedIn: "root",
+      factory: () => new _AfterRenderManager()
+    });
+  }
+};
+var AfterRenderImpl = class _AfterRenderImpl {
+  constructor() {
+    this.ngZone = inject(NgZone);
+    this.scheduler = inject(ChangeDetectionScheduler);
+    this.errorHandler = inject(ErrorHandler, {
+      optional: true
+    });
+    this.sequences = /* @__PURE__ */ new Set();
+    this.deferredRegistrations = /* @__PURE__ */ new Set();
+    this.executing = false;
+  }
+  static {
+    this.PHASES = [AfterRenderPhase.EarlyRead, AfterRenderPhase.Write, AfterRenderPhase.MixedReadWrite, AfterRenderPhase.Read];
+  }
+  /**
+   * Run the sequence of phases of hooks, once through. As a result of executing some hooks, more
+   * might be scheduled.
+   */
+  execute() {
+    this.executing = true;
+    for (const phase of _AfterRenderImpl.PHASES) {
+      for (const sequence of this.sequences) {
+        if (sequence.erroredOrDestroyed || !sequence.hooks[phase]) {
+          continue;
+        }
+        try {
+          sequence.pipelinedValue = this.ngZone.runOutsideAngular(() => sequence.hooks[phase](sequence.pipelinedValue));
+        } catch (err) {
+          sequence.erroredOrDestroyed = true;
+          this.errorHandler?.handleError(err);
+        }
+      }
+    }
+    this.executing = false;
+    for (const sequence of this.sequences) {
+      sequence.afterRun();
+      if (sequence.once) {
+        this.sequences.delete(sequence);
+      }
+    }
+    for (const sequence of this.deferredRegistrations) {
+      this.sequences.add(sequence);
+    }
+    if (this.deferredRegistrations.size > 0) {
+      this.scheduler.notify(
+        7
+        /* NotificationSource.DeferredRenderHook */
+      );
+    }
+    this.deferredRegistrations.clear();
+  }
+  register(sequence) {
+    if (!this.executing) {
+      this.sequences.add(sequence);
+      this.scheduler.notify(
+        6
+        /* NotificationSource.RenderHook */
+      );
+    } else {
+      this.deferredRegistrations.add(sequence);
+    }
+  }
+  unregister(sequence) {
+    if (this.executing && this.sequences.has(sequence)) {
+      sequence.erroredOrDestroyed = true;
+      sequence.pipelinedValue = void 0;
+      sequence.once = true;
+    } else {
+      this.sequences.delete(sequence);
+      this.deferredRegistrations.delete(sequence);
+    }
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _AfterRenderImpl,
+      providedIn: "root",
+      factory: () => new _AfterRenderImpl()
+    });
+  }
+};
+var AfterRenderSequence = class {
+  constructor(impl, hooks, once, destroyRef) {
+    this.impl = impl;
+    this.hooks = hooks;
+    this.once = once;
+    this.erroredOrDestroyed = false;
+    this.pipelinedValue = void 0;
+    this.unregisterOnDestroy = destroyRef.onDestroy(() => this.destroy());
+  }
+  afterRun() {
+    this.erroredOrDestroyed = false;
+    this.pipelinedValue = void 0;
+  }
+  destroy() {
+    this.impl.unregister(this);
+    this.unregisterOnDestroy();
+  }
+};
+function afterRender(callbackOrSpec, options) {
+  ngDevMode && assertNotInReactiveContext(afterRender, "Call `afterRender` outside of a reactive context. For example, schedule the render callback inside the component constructor`.");
+  !options?.injector && assertInInjectionContext(afterRender);
+  const injector = options?.injector ?? inject(Injector);
+  if (!isPlatformBrowser(injector)) {
+    return NOOP_AFTER_RENDER_REF;
+  }
+  performanceMarkFeature("NgAfterRender");
+  return afterRenderImpl(
+    callbackOrSpec,
+    injector,
+    options,
+    /* once */
+    false
+  );
+}
+function afterNextRender(callbackOrSpec, options) {
+  !options?.injector && assertInInjectionContext(afterNextRender);
+  const injector = options?.injector ?? inject(Injector);
+  if (!isPlatformBrowser(injector)) {
+    return NOOP_AFTER_RENDER_REF;
+  }
+  performanceMarkFeature("NgAfterNextRender");
+  return afterRenderImpl(
+    callbackOrSpec,
+    injector,
+    options,
+    /* once */
+    true
+  );
+}
+function getHooks(callbackOrSpec, phase) {
+  if (callbackOrSpec instanceof Function) {
+    const hooks = [void 0, void 0, void 0, void 0];
+    hooks[phase] = callbackOrSpec;
+    return hooks;
+  } else {
+    return [callbackOrSpec.earlyRead, callbackOrSpec.write, callbackOrSpec.mixedReadWrite, callbackOrSpec.read];
+  }
+}
+function afterRenderImpl(callbackOrSpec, injector, options, once) {
+  const manager = injector.get(AfterRenderManager);
+  manager.impl ??= injector.get(AfterRenderImpl);
+  const hooks = options?.phase ?? AfterRenderPhase.MixedReadWrite;
+  const sequence = new AfterRenderSequence(manager.impl, getHooks(callbackOrSpec, hooks), once, injector.get(DestroyRef));
+  manager.impl.register(sequence);
+  return sequence;
+}
+var NOOP_AFTER_RENDER_REF = {
+  destroy() {
+  }
+};
 function getDeferBlockDataIndex(deferBlockIndex) {
   return deferBlockIndex + 1;
 }
@@ -16423,6 +16461,7 @@ function getTriggerElement(triggerLView, triggerIndex) {
 }
 function registerDomTrigger(initialLView, tNode, triggerIndex, walkUpTimes, registerFn, callback, type) {
   const injector = initialLView[INJECTOR];
+  const zone = injector.get(NgZone);
   function pollDomTrigger() {
     if (isDestroyed(initialLView)) {
       return;
@@ -16434,7 +16473,9 @@ function registerDomTrigger(initialLView, tNode, triggerIndex, walkUpTimes, regi
     }
     const triggerLView = getTriggerLView(initialLView, tNode, walkUpTimes);
     if (!triggerLView) {
-      internalAfterNextRender(pollDomTrigger, {
+      afterNextRender({
+        read: pollDomTrigger
+      }, {
         injector
       });
       return;
@@ -16444,17 +16485,21 @@ function registerDomTrigger(initialLView, tNode, triggerIndex, walkUpTimes, regi
     }
     const element = getTriggerElement(triggerLView, triggerIndex);
     const cleanup = registerFn(element, () => {
-      if (initialLView !== triggerLView) {
-        removeLViewOnDestroy(triggerLView, cleanup);
-      }
-      callback();
+      zone.run(() => {
+        if (initialLView !== triggerLView) {
+          removeLViewOnDestroy(triggerLView, cleanup);
+        }
+        callback();
+      });
     }, injector);
     if (initialLView !== triggerLView) {
       storeLViewOnDestroy(triggerLView, cleanup);
     }
     storeTriggerCleanupFn(type, lDetails, cleanup);
   }
-  internalAfterNextRender(pollDomTrigger, {
+  afterNextRender({
+    read: pollDomTrigger
+  }, {
     injector
   });
 }
@@ -16467,7 +16512,7 @@ function onIdle(callback, lView) {
 }
 var _requestIdleCallback = () => typeof requestIdleCallback !== "undefined" ? requestIdleCallback : setTimeout;
 var _cancelIdleCallback = () => typeof requestIdleCallback !== "undefined" ? cancelIdleCallback : clearTimeout;
-var _IdleScheduler = class _IdleScheduler {
+var IdleScheduler = class _IdleScheduler {
   constructor() {
     this.executingCallbacks = false;
     this.idleId = null;
@@ -16525,13 +16570,14 @@ var _IdleScheduler = class _IdleScheduler {
     this.current.clear();
     this.deferred.clear();
   }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _IdleScheduler,
+      providedIn: "root",
+      factory: () => new _IdleScheduler()
+    });
+  }
 };
-_IdleScheduler.ɵprov = ɵɵdefineInjectable({
-  token: _IdleScheduler,
-  providedIn: "root",
-  factory: () => new _IdleScheduler()
-});
-var IdleScheduler = _IdleScheduler;
 function onTimer(delay2) {
   return (callback, lView) => scheduleTimerTrigger(delay2, callback, lView);
 }
@@ -16542,7 +16588,7 @@ function scheduleTimerTrigger(delay2, callback, lView) {
   scheduler.add(delay2, callback);
   return cleanupFn;
 }
-var _TimerScheduler = class _TimerScheduler {
+var TimerScheduler = class _TimerScheduler {
   constructor() {
     this.executingCallbacks = false;
     this.timeoutId = null;
@@ -16657,13 +16703,14 @@ var _TimerScheduler = class _TimerScheduler {
     this.current.length = 0;
     this.deferred.length = 0;
   }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _TimerScheduler,
+      providedIn: "root",
+      factory: () => new _TimerScheduler()
+    });
+  }
 };
-_TimerScheduler.ɵprov = ɵɵdefineInjectable({
-  token: _TimerScheduler,
-  providedIn: "root",
-  factory: () => new _TimerScheduler()
-});
-var TimerScheduler = _TimerScheduler;
 var DEFER_BLOCK_DEPENDENCY_INTERCEPTOR = new InjectionToken("DEFER_BLOCK_DEPENDENCY_INTERCEPTOR");
 var DEFER_BLOCK_CONFIG = new InjectionToken(ngDevMode ? "DEFER_BLOCK_CONFIG" : "");
 function shouldTriggerDeferBlock(injector) {
@@ -18671,7 +18718,7 @@ var _locateOrCreateElementContainerNode = (tView, lView, tNode, index) => {
 function locateOrCreateElementContainerNode(tView, lView, tNode, index) {
   let comment;
   const hydrationInfo = lView[HYDRATION];
-  const isNodeCreationMode = !hydrationInfo || isInSkipHydrationBlock$1() || isDetachedByI18n(tNode);
+  const isNodeCreationMode = !hydrationInfo || isInSkipHydrationBlock$1() || isDisconnectedNode$1(hydrationInfo, index) || isDetachedByI18n(tNode);
   lastNodeWasCreated(isNodeCreationMode);
   if (isNodeCreationMode) {
     return createCommentNode(lView[RENDERER], ngDevMode ? "ng-container" : "");
@@ -19353,7 +19400,8 @@ function i18nStartFirstCreatePass(tView, parentTNodeIndex, lView, index, message
   tView.data[index] = {
     create: createOpCodes,
     update: updateOpCodes,
-    ast: astStack[0]
+    ast: astStack[0],
+    parentTNodeIndex
   };
 }
 function createTNodeAndAddOpCode(tView, rootTNode, existingTNodes, lView, createOpCodes, text, isICU) {
@@ -20634,7 +20682,7 @@ function ɵɵProvidersFeature(providers, viewProviders = []) {
     };
   };
 }
-var _StandaloneService = class _StandaloneService {
+var StandaloneService = class _StandaloneService {
   constructor(_injector) {
     this._injector = _injector;
     this.cachedInjectors = /* @__PURE__ */ new Map();
@@ -20661,13 +20709,14 @@ var _StandaloneService = class _StandaloneService {
       this.cachedInjectors.clear();
     }
   }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _StandaloneService,
+      providedIn: "environment",
+      factory: () => new _StandaloneService(ɵɵinject(EnvironmentInjector))
+    });
+  }
 };
-_StandaloneService.ɵprov = ɵɵdefineInjectable({
-  token: _StandaloneService,
-  providedIn: "environment",
-  factory: () => new _StandaloneService(ɵɵinject(EnvironmentInjector))
-});
-var StandaloneService = _StandaloneService;
 function ɵɵStandaloneFeature(definition) {
   performanceMarkFeature("NgStandalone");
   definition.getStandaloneInjector = (parentInjector) => {
@@ -22040,8 +22089,8 @@ var Version = class {
     this.patch = parts.slice(2).join(".");
   }
 };
-var VERSION = new Version("18.1.2");
-var _Console = class _Console {
+var VERSION = new Version("18.2.6");
+var Console = class _Console {
   log(message) {
     console.log(message);
   }
@@ -22049,16 +22098,19 @@ var _Console = class _Console {
   warn(message) {
     console.warn(message);
   }
+  static {
+    this.ɵfac = function Console_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _Console)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _Console,
+      factory: _Console.ɵfac,
+      providedIn: "platform"
+    });
+  }
 };
-_Console.ɵfac = function Console_Factory(t) {
-  return new (t || _Console)();
-};
-_Console.ɵprov = ɵɵdefineInjectable({
-  token: _Console,
-  factory: _Console.ɵfac,
-  providedIn: "platform"
-});
-var Console = _Console;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(Console, [{
     type: Injectable,
@@ -22568,7 +22620,7 @@ function publishGlobalUtil(name, fn) {
 }
 var TESTABILITY = new InjectionToken("");
 var TESTABILITY_GETTER = new InjectionToken("");
-var _Testability = class _Testability {
+var Testability = class _Testability {
   constructor(_ngZone, registry, testabilityGetter) {
     this._ngZone = _ngZone;
     this.registry = registry;
@@ -22702,15 +22754,18 @@ var _Testability = class _Testability {
   findProviders(using2, provider, exactMatch) {
     return [];
   }
+  static {
+    this.ɵfac = function Testability_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _Testability)(ɵɵinject(NgZone), ɵɵinject(TestabilityRegistry), ɵɵinject(TESTABILITY_GETTER));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _Testability,
+      factory: _Testability.ɵfac
+    });
+  }
 };
-_Testability.ɵfac = function Testability_Factory(t) {
-  return new (t || _Testability)(ɵɵinject(NgZone), ɵɵinject(TestabilityRegistry), ɵɵinject(TESTABILITY_GETTER));
-};
-_Testability.ɵprov = ɵɵdefineInjectable({
-  token: _Testability,
-  factory: _Testability.ɵfac
-});
-var Testability = _Testability;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(Testability, [{
     type: Injectable
@@ -22726,7 +22781,7 @@ var Testability = _Testability;
     }]
   }], null);
 })();
-var _TestabilityRegistry = class _TestabilityRegistry {
+var TestabilityRegistry = class _TestabilityRegistry {
   constructor() {
     this._applications = /* @__PURE__ */ new Map();
   }
@@ -22779,16 +22834,19 @@ var _TestabilityRegistry = class _TestabilityRegistry {
   findTestabilityInTree(elem, findInAncestors = true) {
     return _testabilityGetter?.findTestabilityInTree(this, elem, findInAncestors) ?? null;
   }
+  static {
+    this.ɵfac = function TestabilityRegistry_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _TestabilityRegistry)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _TestabilityRegistry,
+      factory: _TestabilityRegistry.ɵfac,
+      providedIn: "platform"
+    });
+  }
 };
-_TestabilityRegistry.ɵfac = function TestabilityRegistry_Factory(t) {
-  return new (t || _TestabilityRegistry)();
-};
-_TestabilityRegistry.ɵprov = ɵɵdefineInjectable({
-  token: _TestabilityRegistry,
-  factory: _TestabilityRegistry.ɵfac,
-  providedIn: "platform"
-});
-var TestabilityRegistry = _TestabilityRegistry;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(TestabilityRegistry, [{
     type: Injectable,
@@ -22808,7 +22866,7 @@ function isSubscribable(obj) {
   return !!obj && typeof obj.subscribe === "function";
 }
 var APP_INITIALIZER = new InjectionToken(ngDevMode ? "Application Initializer" : "");
-var _ApplicationInitStatus = class _ApplicationInitStatus {
+var ApplicationInitStatus = class _ApplicationInitStatus {
   constructor() {
     this.initialized = false;
     this.done = false;
@@ -22857,16 +22915,19 @@ var _ApplicationInitStatus = class _ApplicationInitStatus {
     }
     this.initialized = true;
   }
+  static {
+    this.ɵfac = function ApplicationInitStatus_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _ApplicationInitStatus)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _ApplicationInitStatus,
+      factory: _ApplicationInitStatus.ɵfac,
+      providedIn: "root"
+    });
+  }
 };
-_ApplicationInitStatus.ɵfac = function ApplicationInitStatus_Factory(t) {
-  return new (t || _ApplicationInitStatus)();
-};
-_ApplicationInitStatus.ɵprov = ɵɵdefineInjectable({
-  token: _ApplicationInitStatus,
-  factory: _ApplicationInitStatus.ɵfac,
-  providedIn: "root"
-});
-var ApplicationInitStatus = _ApplicationInitStatus;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(ApplicationInitStatus, [{
     type: Injectable,
@@ -22915,7 +22976,7 @@ function optionsReducer(dst, objs) {
   }
   return __spreadValues(__spreadValues({}, dst), objs);
 }
-var _ApplicationRef = class _ApplicationRef {
+var ApplicationRef = class _ApplicationRef {
   constructor() {
     this._bootstrapListeners = [];
     this._runningTick = false;
@@ -22923,8 +22984,10 @@ var _ApplicationRef = class _ApplicationRef {
     this._destroyListeners = [];
     this._views = [];
     this.internalErrorHandler = inject(INTERNAL_APPLICATION_ERROR_HANDLER);
-    this.afterRenderEffectManager = inject(AfterRenderEventManager);
+    this.afterRenderManager = inject(AfterRenderManager);
     this.zonelessEnabled = inject(ZONELESS_ENABLED);
+    this.dirtyFlags = 0;
+    this.deferredDirtyFlags = 0;
     this.externalTestViews = /* @__PURE__ */ new Set();
     this.beforeRender = new Subject();
     this.afterTick = new Subject();
@@ -22942,6 +23005,23 @@ var _ApplicationRef = class _ApplicationRef {
    */
   get destroyed() {
     return this._destroyed;
+  }
+  /**
+   * @returns A promise that resolves when the application becomes stable
+   */
+  whenStable() {
+    let subscription;
+    return new Promise((resolve) => {
+      subscription = this.isStable.subscribe({
+        next: (stable) => {
+          if (stable) {
+            resolve();
+          }
+        }
+      });
+    }).finally(() => {
+      subscription.unsubscribe();
+    });
   }
   /**
    * The `EnvironmentInjector` used to create this application.
@@ -23032,10 +23112,13 @@ var _ApplicationRef = class _ApplicationRef {
    * detection pass during which all change detection must complete.
    */
   tick() {
-    this._tick(true);
+    if (!this.zonelessEnabled) {
+      this.dirtyFlags |= 1;
+    }
+    this._tick();
   }
   /** @internal */
-  _tick(refreshViews) {
+  _tick() {
     (typeof ngDevMode === "undefined" || ngDevMode) && this.warnIfDestroyed();
     if (this._runningTick) {
       throw new RuntimeError(101, ngDevMode && "ApplicationRef.tick is called recursively");
@@ -23043,7 +23126,7 @@ var _ApplicationRef = class _ApplicationRef {
     const prevConsumer = setActiveConsumer(null);
     try {
       this._runningTick = true;
-      this.detectChangesInAttachedViews(refreshViews);
+      this.synchronize();
       if (typeof ngDevMode === "undefined" || ngDevMode) {
         for (let view of this._views) {
           view.checkNoChanges();
@@ -23057,45 +23140,84 @@ var _ApplicationRef = class _ApplicationRef {
       this.afterTick.next();
     }
   }
-  detectChangesInAttachedViews(refreshViews) {
+  /**
+   * Performs the core work of synchronizing the application state with the UI, resolving any
+   * pending dirtiness (potentially in a loop).
+   */
+  synchronize() {
     let rendererFactory = null;
     if (!this._injector.destroyed) {
       rendererFactory = this._injector.get(RendererFactory2, null, {
         optional: true
       });
     }
+    this.dirtyFlags |= this.deferredDirtyFlags;
+    this.deferredDirtyFlags = 0;
     let runs = 0;
-    const afterRenderEffectManager = this.afterRenderEffectManager;
-    while (runs < MAXIMUM_REFRESH_RERUNS) {
-      const isFirstPass = runs === 0;
-      if (refreshViews || !isFirstPass) {
-        this.beforeRender.next(isFirstPass);
-        for (let {
-          _lView,
-          notifyErrorHandler
-        } of this._views) {
-          detectChangesInViewIfRequired(_lView, notifyErrorHandler, isFirstPass, this.zonelessEnabled);
-        }
-      } else {
-        rendererFactory?.begin?.();
-        rendererFactory?.end?.();
-      }
-      runs++;
-      afterRenderEffectManager.executeInternalCallbacks();
-      if (this.allViews.some(({
-        _lView
-      }) => requiresRefreshOrTraversal(_lView))) {
-        continue;
-      }
-      afterRenderEffectManager.execute();
-      if (!this.allViews.some(({
-        _lView
-      }) => requiresRefreshOrTraversal(_lView))) {
-        break;
-      }
+    while (this.dirtyFlags !== 0 && runs++ < MAXIMUM_REFRESH_RERUNS) {
+      this.synchronizeOnce(rendererFactory);
     }
     if ((typeof ngDevMode === "undefined" || ngDevMode) && runs >= MAXIMUM_REFRESH_RERUNS) {
       throw new RuntimeError(103, ngDevMode && "Infinite change detection while refreshing application views. Ensure views are not calling `markForCheck` on every template execution or that afterRender hooks always mark views for check.");
+    }
+  }
+  /**
+   * Perform a single synchronization pass.
+   */
+  synchronizeOnce(rendererFactory) {
+    this.dirtyFlags |= this.deferredDirtyFlags;
+    this.deferredDirtyFlags = 0;
+    if (this.dirtyFlags & 7) {
+      const useGlobalCheck = Boolean(
+        this.dirtyFlags & 1
+        /* ApplicationRefDirtyFlags.ViewTreeGlobal */
+      );
+      this.dirtyFlags &= ~7;
+      this.dirtyFlags |= 8;
+      this.beforeRender.next(useGlobalCheck);
+      for (let {
+        _lView,
+        notifyErrorHandler
+      } of this._views) {
+        detectChangesInViewIfRequired(_lView, notifyErrorHandler, useGlobalCheck, this.zonelessEnabled);
+      }
+      this.dirtyFlags &= ~4;
+      this.syncDirtyFlagsWithViews();
+      if (this.dirtyFlags & 7) {
+        return;
+      }
+    } else {
+      rendererFactory?.begin?.();
+      rendererFactory?.end?.();
+    }
+    if (this.dirtyFlags & 8) {
+      this.dirtyFlags &= ~8;
+      this.afterRenderManager.execute();
+    }
+    this.syncDirtyFlagsWithViews();
+  }
+  /**
+   * Checks `allViews` for views which require refresh/traversal, and updates `dirtyFlags`
+   * accordingly, with two potential behaviors:
+   *
+   * 1. If any of our views require updating, then this adds the `ViewTreeTraversal` dirty flag.
+   *    This _should_ be a no-op, since the scheduler should've added the flag at the same time the
+   *    view was marked as needing updating.
+   *
+   *    TODO(alxhub): figure out if this behavior is still needed for edge cases.
+   *
+   * 2. If none of our views require updating, then clear the view-related `dirtyFlag`s. This
+   *    happens when the scheduler is notified of a view becoming dirty, but the view itself isn't
+   *    reachable through traversal from our roots (e.g. it's detached from the CD tree).
+   */
+  syncDirtyFlagsWithViews() {
+    if (this.allViews.some(({
+      _lView
+    }) => requiresRefreshOrTraversal(_lView))) {
+      this.dirtyFlags |= 2;
+      return;
+    } else {
+      this.dirtyFlags &= ~7;
     }
   }
   /**
@@ -23177,16 +23299,19 @@ var _ApplicationRef = class _ApplicationRef {
       console.warn(formatRuntimeError(406, "This instance of the `ApplicationRef` has already been destroyed."));
     }
   }
+  static {
+    this.ɵfac = function ApplicationRef_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _ApplicationRef)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _ApplicationRef,
+      factory: _ApplicationRef.ɵfac,
+      providedIn: "root"
+    });
+  }
 };
-_ApplicationRef.ɵfac = function ApplicationRef_Factory(t) {
-  return new (t || _ApplicationRef)();
-};
-_ApplicationRef.ɵprov = ɵɵdefineInjectable({
-  token: _ApplicationRef,
-  factory: _ApplicationRef.ɵfac,
-  providedIn: "root"
-});
-var ApplicationRef = _ApplicationRef;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(ApplicationRef, [{
     type: Injectable,
@@ -23232,7 +23357,7 @@ var ModuleWithComponentFactories = class {
     this.componentFactories = componentFactories;
   }
 };
-var _Compiler = class _Compiler {
+var Compiler = class _Compiler {
   /**
    * Compiles the given NgModule and all of its components. All templates of the components
    * have to be inlined.
@@ -23247,7 +23372,7 @@ var _Compiler = class _Compiler {
     return Promise.resolve(this.compileModuleSync(moduleType));
   }
   /**
-   * Same as {@link #compileModuleSync} but also creates ComponentFactories for all components.
+   * Same as {@link Compiler#compileModuleSync compileModuleSync} but also creates ComponentFactories for all components.
    */
   compileModuleAndAllComponentsSync(moduleType) {
     const ngModuleFactory = this.compileModuleSync(moduleType);
@@ -23260,7 +23385,7 @@ var _Compiler = class _Compiler {
     return new ModuleWithComponentFactories(ngModuleFactory, componentFactories);
   }
   /**
-   * Same as {@link #compileModuleAsync} but also creates ComponentFactories for all components.
+   * Same as {@link Compiler#compileModuleAsync compileModuleAsync} but also creates ComponentFactories for all components.
    */
   compileModuleAndAllComponentsAsync(moduleType) {
     return Promise.resolve(this.compileModuleAndAllComponentsSync(moduleType));
@@ -23281,16 +23406,19 @@ var _Compiler = class _Compiler {
   getModuleId(moduleType) {
     return void 0;
   }
+  static {
+    this.ɵfac = function Compiler_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _Compiler)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _Compiler,
+      factory: _Compiler.ɵfac,
+      providedIn: "root"
+    });
+  }
 };
-_Compiler.ɵfac = function Compiler_Factory(t) {
-  return new (t || _Compiler)();
-};
-_Compiler.ɵprov = ɵɵdefineInjectable({
-  token: _Compiler,
-  factory: _Compiler.ɵfac,
-  providedIn: "root"
-});
-var Compiler = _Compiler;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(Compiler, [{
     type: Injectable,
@@ -23339,7 +23467,7 @@ function _lastDefined(args) {
   }
   return void 0;
 }
-var _NgZoneChangeDetectionScheduler = class _NgZoneChangeDetectionScheduler {
+var NgZoneChangeDetectionScheduler = class _NgZoneChangeDetectionScheduler {
   constructor() {
     this.zone = inject(NgZone);
     this.changeDetectionScheduler = inject(ChangeDetectionScheduler);
@@ -23363,16 +23491,19 @@ var _NgZoneChangeDetectionScheduler = class _NgZoneChangeDetectionScheduler {
   ngOnDestroy() {
     this._onMicrotaskEmptySubscription?.unsubscribe();
   }
+  static {
+    this.ɵfac = function NgZoneChangeDetectionScheduler_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _NgZoneChangeDetectionScheduler)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _NgZoneChangeDetectionScheduler,
+      factory: _NgZoneChangeDetectionScheduler.ɵfac,
+      providedIn: "root"
+    });
+  }
 };
-_NgZoneChangeDetectionScheduler.ɵfac = function NgZoneChangeDetectionScheduler_Factory(t) {
-  return new (t || _NgZoneChangeDetectionScheduler)();
-};
-_NgZoneChangeDetectionScheduler.ɵprov = ɵɵdefineInjectable({
-  token: _NgZoneChangeDetectionScheduler,
-  factory: _NgZoneChangeDetectionScheduler.ɵfac,
-  providedIn: "root"
-});
-var NgZoneChangeDetectionScheduler = _NgZoneChangeDetectionScheduler;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(NgZoneChangeDetectionScheduler, [{
     type: Injectable,
@@ -23386,9 +23517,12 @@ var PROVIDED_NG_ZONE = new InjectionToken(typeof ngDevMode === "undefined" || ng
 });
 function internalProvideZoneChangeDetection({
   ngZoneFactory,
-  ignoreChangesOutsideZone
+  ignoreChangesOutsideZone,
+  scheduleInRootZone
 }) {
-  ngZoneFactory ??= () => new NgZone(getNgZoneOptions());
+  ngZoneFactory ??= () => new NgZone(__spreadProps(__spreadValues({}, getNgZoneOptions()), {
+    scheduleInRootZone
+  }));
   return [
     {
       provide: NgZone,
@@ -23417,34 +23551,32 @@ function internalProvideZoneChangeDetection({
         };
       }
     },
-    {
-      provide: INTERNAL_APPLICATION_ERROR_HANDLER,
-      useFactory: ngZoneApplicationErrorHandlerFactory
-    },
     // Always disable scheduler whenever explicitly disabled, even if another place called
     // `provideZoneChangeDetection` without the 'ignore' option.
     ignoreChangesOutsideZone === true ? {
       provide: ZONELESS_SCHEDULER_DISABLED,
       useValue: true
-    } : []
+    } : [],
+    {
+      provide: SCHEDULE_IN_ROOT_ZONE,
+      useValue: scheduleInRootZone ?? SCHEDULE_IN_ROOT_ZONE_DEFAULT
+    }
   ];
-}
-function ngZoneApplicationErrorHandlerFactory() {
-  const zone = inject(NgZone);
-  const userErrorHandler = inject(ErrorHandler);
-  return (e) => zone.runOutsideAngular(() => userErrorHandler.handleError(e));
 }
 function provideZoneChangeDetection(options) {
   const ignoreChangesOutsideZone = options?.ignoreChangesOutsideZone;
+  const scheduleInRootZone = options?.scheduleInRootZone;
   const zoneProviders = internalProvideZoneChangeDetection({
     ngZoneFactory: () => {
       const ngZoneOptions = getNgZoneOptions(options);
+      ngZoneOptions.scheduleInRootZone = scheduleInRootZone;
       if (ngZoneOptions.shouldCoalesceEventChangeDetection) {
         performanceMarkFeature("NgZone_CoalesceEvent");
       }
       return new NgZone(ngZoneOptions);
     },
-    ignoreChangesOutsideZone
+    ignoreChangesOutsideZone,
+    scheduleInRootZone
   });
   return makeEnvironmentProviders([{
     provide: PROVIDED_NG_ZONE,
@@ -23461,7 +23593,7 @@ function getNgZoneOptions(options) {
     shouldCoalesceRunChangeDetection: options?.runCoalescing ?? false
   };
 }
-var _ZoneStablePendingTask = class _ZoneStablePendingTask {
+var ZoneStablePendingTask = class _ZoneStablePendingTask {
   constructor() {
     this.subscription = new Subscription();
     this.initialized = false;
@@ -23496,16 +23628,19 @@ var _ZoneStablePendingTask = class _ZoneStablePendingTask {
   ngOnDestroy() {
     this.subscription.unsubscribe();
   }
+  static {
+    this.ɵfac = function ZoneStablePendingTask_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _ZoneStablePendingTask)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _ZoneStablePendingTask,
+      factory: _ZoneStablePendingTask.ɵfac,
+      providedIn: "root"
+    });
+  }
 };
-_ZoneStablePendingTask.ɵfac = function ZoneStablePendingTask_Factory(t) {
-  return new (t || _ZoneStablePendingTask)();
-};
-_ZoneStablePendingTask.ɵprov = ɵɵdefineInjectable({
-  token: _ZoneStablePendingTask,
-  factory: _ZoneStablePendingTask.ɵfac,
-  providedIn: "root"
-});
-var ZoneStablePendingTask = _ZoneStablePendingTask;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(ZoneStablePendingTask, [{
     type: Injectable,
@@ -23529,7 +23664,7 @@ function trackMicrotaskNotificationForDebugging() {
     throw new RuntimeError(103, "Angular could not stabilize because there were endless change notifications within the browser event loop. The stack from the last several notifications: \n" + stackFromLastFewNotifications.join("\n"));
   }
 }
-var _ChangeDetectionSchedulerImpl = class _ChangeDetectionSchedulerImpl {
+var ChangeDetectionSchedulerImpl = class _ChangeDetectionSchedulerImpl {
   constructor() {
     this.appRef = inject(ApplicationRef);
     this.taskService = inject(PendingTasks);
@@ -23545,8 +23680,11 @@ var _ChangeDetectionSchedulerImpl = class _ChangeDetectionSchedulerImpl {
       }
     }];
     this.subscriptions = new Subscription();
+    this.angularZoneId = this.zoneIsDefined ? this.ngZone._inner?.get(angularZoneInstanceIdProperty) : null;
+    this.scheduleInRootZone = !this.zonelessEnabled && this.zoneIsDefined && (inject(SCHEDULE_IN_ROOT_ZONE, {
+      optional: true
+    }) ?? false);
     this.cancelScheduledCallback = null;
-    this.shouldRefreshViews = false;
     this.useMicrotaskScheduler = false;
     this.runningTick = false;
     this.pendingRenderTaskId = null;
@@ -23569,20 +23707,28 @@ var _ChangeDetectionSchedulerImpl = class _ChangeDetectionSchedulerImpl {
       return;
     }
     switch (source) {
+      case 0: {
+        this.appRef.dirtyFlags |= 2;
+        break;
+      }
       case 3:
       case 2:
-      case 0:
       case 4:
       case 5:
       case 1: {
-        this.shouldRefreshViews = true;
+        this.appRef.dirtyFlags |= 4;
         break;
       }
-      case 8:
-      case 7:
-      case 6:
+      case 7: {
+        this.appRef.deferredDirtyFlags |= 8;
+        break;
+      }
       case 9:
+      case 8:
+      case 6:
+      case 10:
       default: {
+        this.appRef.dirtyFlags |= 8;
       }
     }
     if (!this.shouldScheduleTick()) {
@@ -23598,16 +23744,10 @@ var _ChangeDetectionSchedulerImpl = class _ChangeDetectionSchedulerImpl {
     }
     const scheduleCallback = this.useMicrotaskScheduler ? scheduleCallbackWithMicrotask : scheduleCallbackWithRafRace;
     this.pendingRenderTaskId = this.taskService.add();
-    if (this.zoneIsDefined) {
-      Zone.root.run(() => {
-        this.cancelScheduledCallback = scheduleCallback(() => {
-          this.tick(this.shouldRefreshViews);
-        });
-      });
+    if (this.scheduleInRootZone) {
+      this.cancelScheduledCallback = Zone.root.run(() => scheduleCallback(() => this.tick()));
     } else {
-      this.cancelScheduledCallback = scheduleCallback(() => {
-        this.tick(this.shouldRefreshViews);
-      });
+      this.cancelScheduledCallback = this.ngZone.runOutsideAngular(() => scheduleCallback(() => this.tick()));
     }
   }
   shouldScheduleTick() {
@@ -23617,7 +23757,7 @@ var _ChangeDetectionSchedulerImpl = class _ChangeDetectionSchedulerImpl {
     if (this.pendingRenderTaskId !== null || this.runningTick || this.appRef._runningTick) {
       return false;
     }
-    if (!this.zonelessEnabled && this.zoneIsDefined && NgZone.isInAngularZone()) {
+    if (!this.zonelessEnabled && this.zoneIsDefined && Zone.current.get(angularZoneInstanceIdProperty + this.angularZoneId)) {
       return false;
     }
     return true;
@@ -23631,15 +23771,18 @@ var _ChangeDetectionSchedulerImpl = class _ChangeDetectionSchedulerImpl {
    * @param shouldRefreshViews Passed directly to `ApplicationRef._tick` and skips straight to
    *     render hooks when `false`.
    */
-  tick(shouldRefreshViews) {
+  tick() {
     if (this.runningTick || this.appRef.destroyed) {
       return;
+    }
+    if (!this.zonelessEnabled && this.appRef.dirtyFlags & 7) {
+      this.appRef.dirtyFlags |= 1;
     }
     const task = this.taskService.add();
     try {
       this.ngZone.run(() => {
         this.runningTick = true;
-        this.appRef._tick(shouldRefreshViews);
+        this.appRef._tick();
       }, void 0, this.schedulerTickApplyArgs);
     } catch (e) {
       this.taskService.remove(task);
@@ -23658,7 +23801,6 @@ var _ChangeDetectionSchedulerImpl = class _ChangeDetectionSchedulerImpl {
     this.cleanup();
   }
   cleanup() {
-    this.shouldRefreshViews = false;
     this.runningTick = false;
     this.cancelScheduledCallback?.();
     this.cancelScheduledCallback = null;
@@ -23668,16 +23810,19 @@ var _ChangeDetectionSchedulerImpl = class _ChangeDetectionSchedulerImpl {
       this.taskService.remove(taskId);
     }
   }
+  static {
+    this.ɵfac = function ChangeDetectionSchedulerImpl_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _ChangeDetectionSchedulerImpl)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _ChangeDetectionSchedulerImpl,
+      factory: _ChangeDetectionSchedulerImpl.ɵfac,
+      providedIn: "root"
+    });
+  }
 };
-_ChangeDetectionSchedulerImpl.ɵfac = function ChangeDetectionSchedulerImpl_Factory(t) {
-  return new (t || _ChangeDetectionSchedulerImpl)();
-};
-_ChangeDetectionSchedulerImpl.ɵprov = ɵɵdefineInjectable({
-  token: _ChangeDetectionSchedulerImpl,
-  factory: _ChangeDetectionSchedulerImpl.ɵfac,
-  providedIn: "root"
-});
-var ChangeDetectionSchedulerImpl = _ChangeDetectionSchedulerImpl;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(ChangeDetectionSchedulerImpl, [{
     type: Injectable,
@@ -23701,6 +23846,9 @@ function provideExperimentalZonelessChangeDetection() {
   }, {
     provide: ZONELESS_ENABLED,
     useValue: true
+  }, {
+    provide: SCHEDULE_IN_ROOT_ZONE,
+    useValue: false
   }, typeof ngDevMode === "undefined" || ngDevMode ? [{
     provide: PROVIDED_ZONELESS,
     useValue: true
@@ -23729,8 +23877,224 @@ var MissingTranslationStrategy;
   MissingTranslationStrategy2[MissingTranslationStrategy2["Warning"] = 1] = "Warning";
   MissingTranslationStrategy2[MissingTranslationStrategy2["Ignore"] = 2] = "Ignore";
 })(MissingTranslationStrategy || (MissingTranslationStrategy = {}));
+var SCAN_DELAY = 200;
+var OVERSIZED_IMAGE_TOLERANCE = 1200;
+var ImagePerformanceWarning = class _ImagePerformanceWarning {
+  constructor() {
+    this.window = null;
+    this.observer = null;
+    this.options = inject(IMAGE_CONFIG);
+    this.isBrowser = inject(PLATFORM_ID) === "browser";
+  }
+  start() {
+    if (!this.isBrowser || typeof PerformanceObserver === "undefined" || this.options?.disableImageSizeWarning && this.options?.disableImageLazyLoadWarning) {
+      return;
+    }
+    this.observer = this.initPerformanceObserver();
+    const doc = getDocument();
+    const win = doc.defaultView;
+    if (typeof win !== "undefined") {
+      this.window = win;
+      const waitToScan = () => {
+        setTimeout(this.scanImages.bind(this), SCAN_DELAY);
+      };
+      const setup = () => {
+        if (doc.readyState === "complete") {
+          waitToScan();
+        } else {
+          this.window?.addEventListener("load", waitToScan, {
+            once: true
+          });
+        }
+      };
+      if (typeof Zone !== "undefined") {
+        Zone.root.run(() => setup());
+      } else {
+        setup();
+      }
+    }
+  }
+  ngOnDestroy() {
+    this.observer?.disconnect();
+  }
+  initPerformanceObserver() {
+    if (typeof PerformanceObserver === "undefined") {
+      return null;
+    }
+    const observer = new PerformanceObserver((entryList) => {
+      const entries = entryList.getEntries();
+      if (entries.length === 0) return;
+      const lcpElement = entries[entries.length - 1];
+      const imgSrc = lcpElement.element?.src ?? "";
+      if (imgSrc.startsWith("data:") || imgSrc.startsWith("blob:")) return;
+      this.lcpImageUrl = imgSrc;
+    });
+    observer.observe({
+      type: "largest-contentful-paint",
+      buffered: true
+    });
+    return observer;
+  }
+  scanImages() {
+    const images = getDocument().querySelectorAll("img");
+    let lcpElementFound, lcpElementLoadedCorrectly = false;
+    images.forEach((image) => {
+      if (!this.options?.disableImageSizeWarning) {
+        for (const image2 of images) {
+          if (!image2.getAttribute("ng-img") && this.isOversized(image2)) {
+            logOversizedImageWarning(image2.src);
+          }
+        }
+      }
+      if (!this.options?.disableImageLazyLoadWarning && this.lcpImageUrl) {
+        if (image.src === this.lcpImageUrl) {
+          lcpElementFound = true;
+          if (image.loading !== "lazy" || image.getAttribute("ng-img")) {
+            lcpElementLoadedCorrectly = true;
+          }
+        }
+      }
+    });
+    if (lcpElementFound && !lcpElementLoadedCorrectly && this.lcpImageUrl && !this.options?.disableImageLazyLoadWarning) {
+      logLazyLCPWarning(this.lcpImageUrl);
+    }
+  }
+  isOversized(image) {
+    if (!this.window) {
+      return false;
+    }
+    const computedStyle = this.window.getComputedStyle(image);
+    let renderedWidth = parseFloat(computedStyle.getPropertyValue("width"));
+    let renderedHeight = parseFloat(computedStyle.getPropertyValue("height"));
+    const boxSizing = computedStyle.getPropertyValue("box-sizing");
+    const objectFit = computedStyle.getPropertyValue("object-fit");
+    if (objectFit === `cover`) {
+      return false;
+    }
+    if (boxSizing === "border-box") {
+      const paddingTop = computedStyle.getPropertyValue("padding-top");
+      const paddingRight = computedStyle.getPropertyValue("padding-right");
+      const paddingBottom = computedStyle.getPropertyValue("padding-bottom");
+      const paddingLeft = computedStyle.getPropertyValue("padding-left");
+      renderedWidth -= parseFloat(paddingRight) + parseFloat(paddingLeft);
+      renderedHeight -= parseFloat(paddingTop) + parseFloat(paddingBottom);
+    }
+    const intrinsicWidth = image.naturalWidth;
+    const intrinsicHeight = image.naturalHeight;
+    const recommendedWidth = this.window.devicePixelRatio * renderedWidth;
+    const recommendedHeight = this.window.devicePixelRatio * renderedHeight;
+    const oversizedWidth = intrinsicWidth - recommendedWidth >= OVERSIZED_IMAGE_TOLERANCE;
+    const oversizedHeight = intrinsicHeight - recommendedHeight >= OVERSIZED_IMAGE_TOLERANCE;
+    return oversizedWidth || oversizedHeight;
+  }
+  static {
+    this.ɵfac = function ImagePerformanceWarning_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _ImagePerformanceWarning)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _ImagePerformanceWarning,
+      factory: _ImagePerformanceWarning.ɵfac,
+      providedIn: "root"
+    });
+  }
+};
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(ImagePerformanceWarning, [{
+    type: Injectable,
+    args: [{
+      providedIn: "root"
+    }]
+  }], null, null);
+})();
+function logLazyLCPWarning(src) {
+  console.warn(formatRuntimeError(-913, `An image with src ${src} is the Largest Contentful Paint (LCP) element but was given a "loading" value of "lazy", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to "eager", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://angular.dev/errors/NG0913`));
+}
+function logOversizedImageWarning(src) {
+  console.warn(formatRuntimeError(-913, `An image with src ${src} has intrinsic file dimensions much larger than its rendered size. This can negatively impact application loading performance. For more information about addressing or disabling this warning, see https://angular.dev/errors/NG0913`));
+}
 var PLATFORM_DESTROY_LISTENERS = new InjectionToken(ngDevMode ? "PlatformDestroyListeners" : "");
-var _PlatformRef = class _PlatformRef {
+function isApplicationBootstrapConfig(config2) {
+  return !!config2.platformInjector;
+}
+function bootstrap(config2) {
+  const envInjector = isApplicationBootstrapConfig(config2) ? config2.r3Injector : config2.moduleRef.injector;
+  const ngZone = envInjector.get(NgZone);
+  return ngZone.run(() => {
+    if (isApplicationBootstrapConfig(config2)) {
+      config2.r3Injector.resolveInjectorInitializers();
+    } else {
+      config2.moduleRef.resolveInjectorInitializers();
+    }
+    const exceptionHandler = envInjector.get(ErrorHandler, null);
+    if (typeof ngDevMode === "undefined" || ngDevMode) {
+      if (exceptionHandler === null) {
+        const errorMessage = isApplicationBootstrapConfig(config2) ? "No `ErrorHandler` found in the Dependency Injection tree." : "No ErrorHandler. Is platform module (BrowserModule) included";
+        throw new RuntimeError(402, errorMessage);
+      }
+      if (envInjector.get(PROVIDED_ZONELESS) && envInjector.get(PROVIDED_NG_ZONE)) {
+        throw new RuntimeError(408, "Invalid change detection configuration: provideZoneChangeDetection and provideExperimentalZonelessChangeDetection cannot be used together.");
+      }
+    }
+    let onErrorSubscription;
+    ngZone.runOutsideAngular(() => {
+      onErrorSubscription = ngZone.onError.subscribe({
+        next: (error) => {
+          exceptionHandler.handleError(error);
+        }
+      });
+    });
+    if (isApplicationBootstrapConfig(config2)) {
+      const destroyListener = () => envInjector.destroy();
+      const onPlatformDestroyListeners = config2.platformInjector.get(PLATFORM_DESTROY_LISTENERS);
+      onPlatformDestroyListeners.add(destroyListener);
+      envInjector.onDestroy(() => {
+        onErrorSubscription.unsubscribe();
+        onPlatformDestroyListeners.delete(destroyListener);
+      });
+    } else {
+      config2.moduleRef.onDestroy(() => {
+        remove(config2.allPlatformModules, config2.moduleRef);
+        onErrorSubscription.unsubscribe();
+      });
+    }
+    return _callAndReportToErrorHandler(exceptionHandler, ngZone, () => {
+      const initStatus = envInjector.get(ApplicationInitStatus);
+      initStatus.runInitializers();
+      return initStatus.donePromise.then(() => {
+        const localeId = envInjector.get(LOCALE_ID, DEFAULT_LOCALE_ID);
+        setLocaleId(localeId || DEFAULT_LOCALE_ID);
+        if (typeof ngDevMode === "undefined" || ngDevMode) {
+          const imagePerformanceService = envInjector.get(ImagePerformanceWarning);
+          imagePerformanceService.start();
+        }
+        if (isApplicationBootstrapConfig(config2)) {
+          const appRef = envInjector.get(ApplicationRef);
+          if (config2.rootComponent !== void 0) {
+            appRef.bootstrap(config2.rootComponent);
+          }
+          return appRef;
+        } else {
+          moduleDoBootstrap(config2.moduleRef, config2.allPlatformModules);
+          return config2.moduleRef;
+        }
+      });
+    });
+  });
+}
+function moduleDoBootstrap(moduleRef, allPlatformModules) {
+  const appRef = moduleRef.injector.get(ApplicationRef);
+  if (moduleRef._bootstrapComponents.length > 0) {
+    moduleRef._bootstrapComponents.forEach((f) => appRef.bootstrap(f));
+  } else if (moduleRef.instance.ngDoBootstrap) {
+    moduleRef.instance.ngDoBootstrap(appRef);
+  } else {
+    throw new RuntimeError(-403, ngDevMode && `The module ${stringify(moduleRef.instance.constructor)} was bootstrapped, but it does not declare "@NgModule.bootstrap" components nor a "ngDoBootstrap" method. Please define one of these.`);
+  }
+  allPlatformModules.push(moduleRef);
+}
+var PlatformRef = class _PlatformRef {
   /** @internal */
   constructor(_injector) {
     this._injector = _injector;
@@ -23745,52 +24109,25 @@ var _PlatformRef = class _PlatformRef {
    *     argument is deprecated. Use the `PlatformRef.bootstrapModule` API instead.
    */
   bootstrapModuleFactory(moduleFactory, options) {
-    const ngZone = getNgZone(options?.ngZone, getNgZoneOptions({
+    const scheduleInRootZone = options?.scheduleInRootZone;
+    const ngZoneFactory = () => getNgZone(options?.ngZone, __spreadProps(__spreadValues({}, getNgZoneOptions({
       eventCoalescing: options?.ngZoneEventCoalescing,
       runCoalescing: options?.ngZoneRunCoalescing
+    })), {
+      scheduleInRootZone
     }));
-    return ngZone.run(() => {
-      const ignoreChangesOutsideZone = options?.ignoreChangesOutsideZone;
-      const moduleRef = createNgModuleRefWithProviders(moduleFactory.moduleType, this.injector, [...internalProvideZoneChangeDetection({
-        ngZoneFactory: () => ngZone,
-        ignoreChangesOutsideZone
-      }), {
-        provide: ChangeDetectionScheduler,
-        useExisting: ChangeDetectionSchedulerImpl
-      }]);
-      if (typeof ngDevMode === "undefined" || ngDevMode) {
-        if (moduleRef.injector.get(PROVIDED_NG_ZONE)) {
-          throw new RuntimeError(207, "`bootstrapModule` does not support `provideZoneChangeDetection`. Use `BootstrapOptions` instead.");
-        }
-        if (moduleRef.injector.get(ZONELESS_ENABLED) && options?.ngZone !== "noop") {
-          throw new RuntimeError(408, "Invalid change detection configuration: `ngZone: 'noop'` must be set in `BootstrapOptions` with provideExperimentalZonelessChangeDetection.");
-        }
-      }
-      const exceptionHandler = moduleRef.injector.get(ErrorHandler, null);
-      if ((typeof ngDevMode === "undefined" || ngDevMode) && exceptionHandler === null) {
-        throw new RuntimeError(402, "No ErrorHandler. Is platform module (BrowserModule) included?");
-      }
-      ngZone.runOutsideAngular(() => {
-        const subscription = ngZone.onError.subscribe({
-          next: (error) => {
-            exceptionHandler.handleError(error);
-          }
-        });
-        moduleRef.onDestroy(() => {
-          remove(this._modules, moduleRef);
-          subscription.unsubscribe();
-        });
-      });
-      return _callAndReportToErrorHandler(exceptionHandler, ngZone, () => {
-        const initStatus = moduleRef.injector.get(ApplicationInitStatus);
-        initStatus.runInitializers();
-        return initStatus.donePromise.then(() => {
-          const localeId = moduleRef.injector.get(LOCALE_ID, DEFAULT_LOCALE_ID);
-          setLocaleId(localeId || DEFAULT_LOCALE_ID);
-          this._moduleDoBootstrap(moduleRef);
-          return moduleRef;
-        });
-      });
+    const ignoreChangesOutsideZone = options?.ignoreChangesOutsideZone;
+    const allAppProviders = [internalProvideZoneChangeDetection({
+      ngZoneFactory,
+      ignoreChangesOutsideZone
+    }), {
+      provide: ChangeDetectionScheduler,
+      useExisting: ChangeDetectionSchedulerImpl
+    }];
+    const moduleRef = createNgModuleRefWithProviders(moduleFactory.moduleType, this.injector, allAppProviders);
+    return bootstrap({
+      moduleRef,
+      allPlatformModules: this._modules
     });
   }
   /**
@@ -23812,17 +24149,6 @@ var _PlatformRef = class _PlatformRef {
   bootstrapModule(moduleType, compilerOptions = []) {
     const options = optionsReducer({}, compilerOptions);
     return compileNgModuleFactory(this.injector, options, moduleType).then((moduleFactory) => this.bootstrapModuleFactory(moduleFactory, options));
-  }
-  _moduleDoBootstrap(moduleRef) {
-    const appRef = moduleRef.injector.get(ApplicationRef);
-    if (moduleRef._bootstrapComponents.length > 0) {
-      moduleRef._bootstrapComponents.forEach((f) => appRef.bootstrap(f));
-    } else if (moduleRef.instance.ngDoBootstrap) {
-      moduleRef.instance.ngDoBootstrap(appRef);
-    } else {
-      throw new RuntimeError(-403, ngDevMode && `The module ${stringify(moduleRef.instance.constructor)} was bootstrapped, but it does not declare "@NgModule.bootstrap" components nor a "ngDoBootstrap" method. Please define one of these.`);
-    }
-    this._modules.push(moduleRef);
   }
   /**
    * Registers a listener to be called when the platform is destroyed.
@@ -23860,16 +24186,19 @@ var _PlatformRef = class _PlatformRef {
   get destroyed() {
     return this._destroyed;
   }
+  static {
+    this.ɵfac = function PlatformRef_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _PlatformRef)(ɵɵinject(Injector));
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _PlatformRef,
+      factory: _PlatformRef.ɵfac,
+      providedIn: "platform"
+    });
+  }
 };
-_PlatformRef.ɵfac = function PlatformRef_Factory(t) {
-  return new (t || _PlatformRef)(ɵɵinject(Injector));
-};
-_PlatformRef.ɵprov = ɵɵdefineInjectable({
-  token: _PlatformRef,
-  factory: _PlatformRef.ɵfac,
-  providedIn: "platform"
-});
-var PlatformRef = _PlatformRef;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(PlatformRef, [{
     type: Injectable,
@@ -24073,10 +24402,11 @@ function getNgModuleById(id) {
 function noModuleError(id) {
   return new Error(`No module with ID ${id} loaded`);
 }
-var _ChangeDetectorRef = class _ChangeDetectorRef {
+var ChangeDetectorRef = class {
+  static {
+    this.__NG_ELEMENT_ID__ = injectChangeDetectorRef;
+  }
 };
-_ChangeDetectorRef.__NG_ELEMENT_ID__ = injectChangeDetectorRef;
-var ChangeDetectorRef = _ChangeDetectorRef;
 function injectChangeDetectorRef(flags) {
   return createViewRef(
     getCurrentTNode(),
@@ -25275,7 +25605,14 @@ var KeyValueChangeRecord_ = class {
 function defaultIterableDiffersFactory() {
   return new IterableDiffers([new DefaultIterableDifferFactory()]);
 }
-var _IterableDiffers = class _IterableDiffers {
+var IterableDiffers = class _IterableDiffers {
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _IterableDiffers,
+      providedIn: "root",
+      factory: defaultIterableDiffersFactory
+    });
+  }
   constructor(factories) {
     this.factories = factories;
   }
@@ -25325,19 +25662,20 @@ var _IterableDiffers = class _IterableDiffers {
     }
   }
 };
-_IterableDiffers.ɵprov = ɵɵdefineInjectable({
-  token: _IterableDiffers,
-  providedIn: "root",
-  factory: defaultIterableDiffersFactory
-});
-var IterableDiffers = _IterableDiffers;
 function getTypeNameForDebugging(type) {
   return type["name"] || typeof type;
 }
 function defaultKeyValueDiffersFactory() {
   return new KeyValueDiffers([new DefaultKeyValueDifferFactory()]);
 }
-var _KeyValueDiffers = class _KeyValueDiffers {
+var KeyValueDiffers = class _KeyValueDiffers {
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _KeyValueDiffers,
+      providedIn: "root",
+      factory: defaultKeyValueDiffersFactory
+    });
+  }
   constructor(factories) {
     this.factories = factories;
   }
@@ -25386,30 +25724,29 @@ var _KeyValueDiffers = class _KeyValueDiffers {
     throw new RuntimeError(901, ngDevMode && `Cannot find a differ supporting object '${kv}'`);
   }
 };
-_KeyValueDiffers.ɵprov = ɵɵdefineInjectable({
-  token: _KeyValueDiffers,
-  providedIn: "root",
-  factory: defaultKeyValueDiffersFactory
-});
-var KeyValueDiffers = _KeyValueDiffers;
 var keyValDiff = [new DefaultKeyValueDifferFactory()];
 var iterableDiff = [new DefaultIterableDifferFactory()];
 var defaultIterableDiffers = new IterableDiffers(iterableDiff);
 var defaultKeyValueDiffers = new KeyValueDiffers(keyValDiff);
 var platformCore = createPlatformFactory(null, "core", []);
-var _ApplicationModule = class _ApplicationModule {
+var ApplicationModule = class _ApplicationModule {
   // Inject ApplicationRef to make it eager...
   constructor(appRef) {
   }
+  static {
+    this.ɵfac = function ApplicationModule_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _ApplicationModule)(ɵɵinject(ApplicationRef));
+    };
+  }
+  static {
+    this.ɵmod = ɵɵdefineNgModule({
+      type: _ApplicationModule
+    });
+  }
+  static {
+    this.ɵinj = ɵɵdefineInjector({});
+  }
 };
-_ApplicationModule.ɵfac = function ApplicationModule_Factory(t) {
-  return new (t || _ApplicationModule)(ɵɵinject(ApplicationRef));
-};
-_ApplicationModule.ɵmod = ɵɵdefineNgModule({
-  type: _ApplicationModule
-});
-_ApplicationModule.ɵinj = ɵɵdefineInjector({});
-var ApplicationModule = _ApplicationModule;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(ApplicationModule, [{
     type: NgModule
@@ -25564,135 +25901,6 @@ var WATCH_NODE2 = (() => {
 })();
 function setAlternateWeakRefImpl(impl) {
 }
-var SCAN_DELAY = 200;
-var OVERSIZED_IMAGE_TOLERANCE = 1200;
-var _ImagePerformanceWarning = class _ImagePerformanceWarning {
-  constructor() {
-    this.window = null;
-    this.observer = null;
-    this.options = inject(IMAGE_CONFIG);
-    this.ngZone = inject(NgZone);
-  }
-  start() {
-    if (typeof PerformanceObserver === "undefined" || this.options?.disableImageSizeWarning && this.options?.disableImageLazyLoadWarning) {
-      return;
-    }
-    this.observer = this.initPerformanceObserver();
-    const doc = getDocument();
-    const win = doc.defaultView;
-    if (typeof win !== "undefined") {
-      this.window = win;
-      const waitToScan = () => {
-        setTimeout(this.scanImages.bind(this), SCAN_DELAY);
-      };
-      this.ngZone.runOutsideAngular(() => {
-        if (doc.readyState === "complete") {
-          waitToScan();
-        } else {
-          this.window?.addEventListener("load", waitToScan, {
-            once: true
-          });
-        }
-      });
-    }
-  }
-  ngOnDestroy() {
-    this.observer?.disconnect();
-  }
-  initPerformanceObserver() {
-    if (typeof PerformanceObserver === "undefined") {
-      return null;
-    }
-    const observer = new PerformanceObserver((entryList) => {
-      const entries = entryList.getEntries();
-      if (entries.length === 0) return;
-      const lcpElement = entries[entries.length - 1];
-      const imgSrc = lcpElement.element?.src ?? "";
-      if (imgSrc.startsWith("data:") || imgSrc.startsWith("blob:")) return;
-      this.lcpImageUrl = imgSrc;
-    });
-    observer.observe({
-      type: "largest-contentful-paint",
-      buffered: true
-    });
-    return observer;
-  }
-  scanImages() {
-    const images = getDocument().querySelectorAll("img");
-    let lcpElementFound, lcpElementLoadedCorrectly = false;
-    images.forEach((image) => {
-      if (!this.options?.disableImageSizeWarning) {
-        for (const image2 of images) {
-          if (!image2.getAttribute("ng-img") && this.isOversized(image2)) {
-            logOversizedImageWarning(image2.src);
-          }
-        }
-      }
-      if (!this.options?.disableImageLazyLoadWarning && this.lcpImageUrl) {
-        if (image.src === this.lcpImageUrl) {
-          lcpElementFound = true;
-          if (image.loading !== "lazy" || image.getAttribute("ng-img")) {
-            lcpElementLoadedCorrectly = true;
-          }
-        }
-      }
-    });
-    if (lcpElementFound && !lcpElementLoadedCorrectly && this.lcpImageUrl && !this.options?.disableImageLazyLoadWarning) {
-      logLazyLCPWarning(this.lcpImageUrl);
-    }
-  }
-  isOversized(image) {
-    if (!this.window) {
-      return false;
-    }
-    const computedStyle = this.window.getComputedStyle(image);
-    let renderedWidth = parseFloat(computedStyle.getPropertyValue("width"));
-    let renderedHeight = parseFloat(computedStyle.getPropertyValue("height"));
-    const boxSizing = computedStyle.getPropertyValue("box-sizing");
-    const objectFit = computedStyle.getPropertyValue("object-fit");
-    if (objectFit === `cover`) {
-      return false;
-    }
-    if (boxSizing === "border-box") {
-      const paddingTop = computedStyle.getPropertyValue("padding-top");
-      const paddingRight = computedStyle.getPropertyValue("padding-right");
-      const paddingBottom = computedStyle.getPropertyValue("padding-bottom");
-      const paddingLeft = computedStyle.getPropertyValue("padding-left");
-      renderedWidth -= parseFloat(paddingRight) + parseFloat(paddingLeft);
-      renderedHeight -= parseFloat(paddingTop) + parseFloat(paddingBottom);
-    }
-    const intrinsicWidth = image.naturalWidth;
-    const intrinsicHeight = image.naturalHeight;
-    const recommendedWidth = this.window.devicePixelRatio * renderedWidth;
-    const recommendedHeight = this.window.devicePixelRatio * renderedHeight;
-    const oversizedWidth = intrinsicWidth - recommendedWidth >= OVERSIZED_IMAGE_TOLERANCE;
-    const oversizedHeight = intrinsicHeight - recommendedHeight >= OVERSIZED_IMAGE_TOLERANCE;
-    return oversizedWidth || oversizedHeight;
-  }
-};
-_ImagePerformanceWarning.ɵfac = function ImagePerformanceWarning_Factory(t) {
-  return new (t || _ImagePerformanceWarning)();
-};
-_ImagePerformanceWarning.ɵprov = ɵɵdefineInjectable({
-  token: _ImagePerformanceWarning,
-  factory: _ImagePerformanceWarning.ɵfac,
-  providedIn: "root"
-});
-var ImagePerformanceWarning = _ImagePerformanceWarning;
-(() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(ImagePerformanceWarning, [{
-    type: Injectable,
-    args: [{
-      providedIn: "root"
-    }]
-  }], null, null);
-})();
-function logLazyLCPWarning(src) {
-  console.warn(formatRuntimeError(-913, `An image with src ${src} is the Largest Contentful Paint (LCP) element but was given a "loading" value of "lazy", which can negatively impact application loading performance. This warning can be addressed by changing the loading value of the LCP image to "eager", or by using the NgOptimizedImage directive's prioritization utilities. For more information about addressing or disabling this warning, see https://angular.dev/errors/NG0913`));
-}
-function logOversizedImageWarning(src) {
-  console.warn(formatRuntimeError(-913, `An image with src ${src} has intrinsic file dimensions much larger than its rendered size. This can negatively impact application loading performance. For more information about addressing or disabling this warning, see https://angular.dev/errors/NG0913`));
-}
 function internalCreateApplication(config2) {
   try {
     const {
@@ -25716,51 +25924,10 @@ function internalCreateApplication(config2) {
       // happens after we get the NgZone instance from the Injector.
       runEnvironmentInitializers: false
     });
-    const envInjector = adapter.injector;
-    const ngZone = envInjector.get(NgZone);
-    return ngZone.run(() => {
-      envInjector.resolveInjectorInitializers();
-      const exceptionHandler = envInjector.get(ErrorHandler, null);
-      if (typeof ngDevMode === "undefined" || ngDevMode) {
-        if (!exceptionHandler) {
-          throw new RuntimeError(402, "No `ErrorHandler` found in the Dependency Injection tree.");
-        }
-        if (envInjector.get(PROVIDED_ZONELESS) && envInjector.get(PROVIDED_NG_ZONE)) {
-          throw new RuntimeError(408, "Invalid change detection configuration: provideZoneChangeDetection and provideExperimentalZonelessChangeDetection cannot be used together.");
-        }
-      }
-      let onErrorSubscription;
-      ngZone.runOutsideAngular(() => {
-        onErrorSubscription = ngZone.onError.subscribe({
-          next: (error) => {
-            exceptionHandler.handleError(error);
-          }
-        });
-      });
-      const destroyListener = () => envInjector.destroy();
-      const onPlatformDestroyListeners = platformInjector.get(PLATFORM_DESTROY_LISTENERS);
-      onPlatformDestroyListeners.add(destroyListener);
-      envInjector.onDestroy(() => {
-        onErrorSubscription.unsubscribe();
-        onPlatformDestroyListeners.delete(destroyListener);
-      });
-      return _callAndReportToErrorHandler(exceptionHandler, ngZone, () => {
-        const initStatus = envInjector.get(ApplicationInitStatus);
-        initStatus.runInitializers();
-        return initStatus.donePromise.then(() => {
-          const localeId = envInjector.get(LOCALE_ID, DEFAULT_LOCALE_ID);
-          setLocaleId(localeId || DEFAULT_LOCALE_ID);
-          const appRef = envInjector.get(ApplicationRef);
-          if (rootComponent !== void 0) {
-            appRef.bootstrap(rootComponent);
-          }
-          if (typeof ngDevMode === "undefined" || ngDevMode) {
-            const imagePerformanceService = envInjector.get(ImagePerformanceWarning);
-            imagePerformanceService.start();
-          }
-          return appRef;
-        });
-      });
+    return bootstrap({
+      r3Injector: adapter.injector,
+      platformInjector,
+      rootComponent
     });
   } catch (e) {
     return Promise.reject(e);
@@ -25827,7 +25994,7 @@ var JSACTION_EVENT_CONTRACT = new InjectionToken(ngDevMode ? "EVENT_CONTRACT_DET
   factory: () => ({})
 });
 var GLOBAL_EVENT_DELEGATION = new InjectionToken(ngDevMode ? "GLOBAL_EVENT_DELEGATION" : "");
-var _GlobalEventDelegation = class _GlobalEventDelegation {
+var GlobalEventDelegation = class _GlobalEventDelegation {
   constructor() {
     this.eventContractDetails = inject(JSACTION_EVENT_CONTRACT);
   }
@@ -25837,24 +26004,35 @@ var _GlobalEventDelegation = class _GlobalEventDelegation {
   supports(eventType) {
     return isEarlyEventType(eventType);
   }
-  addEventListener(element, eventName, handler) {
-    this.eventContractDetails.instance.addEvent(eventName);
-    sharedStashFunction(element, eventName, handler);
-    getDefaulted(element)[eventName] = "";
-    return () => this.removeEventListener(element, eventName, handler);
+  addEventListener(element, eventType, handler) {
+    if (element.nodeType === Node.ELEMENT_NODE) {
+      this.eventContractDetails.instance.addEvent(eventType);
+      getDefaulted(element)[eventType] = "";
+      sharedStashFunction(element, eventType, handler);
+    } else {
+      element.addEventListener(eventType, handler);
+    }
+    return () => this.removeEventListener(element, eventType, handler);
   }
   removeEventListener(element, eventType, callback) {
-    getDefaulted(element)[eventType] = void 0;
+    if (element.nodeType === Node.ELEMENT_NODE) {
+      getDefaulted(element)[eventType] = void 0;
+    } else {
+      element.removeEventListener(eventType, callback);
+    }
+  }
+  static {
+    this.ɵfac = function GlobalEventDelegation_Factory(__ngFactoryType__) {
+      return new (__ngFactoryType__ || _GlobalEventDelegation)();
+    };
+  }
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _GlobalEventDelegation,
+      factory: _GlobalEventDelegation.ɵfac
+    });
   }
 };
-_GlobalEventDelegation.ɵfac = function GlobalEventDelegation_Factory(t) {
-  return new (t || _GlobalEventDelegation)();
-};
-_GlobalEventDelegation.ɵprov = ɵɵdefineInjectable({
-  token: _GlobalEventDelegation,
-  factory: _GlobalEventDelegation.ɵfac
-});
-var GlobalEventDelegation = _GlobalEventDelegation;
 (() => {
   (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(GlobalEventDelegation, [{
     type: Injectable
@@ -25865,7 +26043,11 @@ var initGlobalEventDelegation = (eventContractDetails, injector) => {
     return;
   }
   const eventContract = eventContractDetails.instance = new EventContract(new EventContractContainer(document.body));
-  const dispatcher = new EventDispatcher(invokeRegisteredListeners);
+  const dispatcher = new EventDispatcher(
+    invokeRegisteredListeners,
+    /** clickModSupport */
+    false
+  );
   registerDispatcher$1(eventContract, dispatcher);
 };
 var jsactionSet = /* @__PURE__ */ new Set();
@@ -26198,7 +26380,7 @@ function serializeLView(lView, context2) {
       }
       ngh[CONTAINERS] ??= {};
       ngh[CONTAINERS][noOffsetIndex] = serializeLContainer(lView[i], context2);
-    } else if (Array.isArray(lView[i])) {
+    } else if (Array.isArray(lView[i]) && !isLetDeclaration(tNode)) {
       const targetNode = unwrapRNode(lView[i][HOST]);
       if (!targetNode.hasAttribute(SKIP_HYDRATION_ATTR_NAME)) {
         annotateHostElementForHydration(targetNode, lView[i], context2);
@@ -26224,6 +26406,9 @@ function serializeLView(lView, context2) {
   return ngh;
 }
 function conditionallyAnnotateNodePath(ngh, tNode, lView, excludedParentNodes) {
+  if (isProjectionTNode(tNode)) {
+    return;
+  }
   if (tNode.projectionNext && tNode.projectionNext !== tNode.next && !isInSkipHydrationBlock(tNode.projectionNext)) {
     appendSerializedNodePath(ngh, tNode.projectionNext, lView, excludedParentNodes);
   }
@@ -26392,7 +26577,7 @@ function verifySsrContentsIntegrity() {
     throw new RuntimeError(-507, typeof ngDevMode !== "undefined" && ngDevMode && "Angular hydration logic detected that HTML content of this page was modified after it was produced during server side rendering. Make sure that there are no optimizations that remove comment nodes from HTML enabled on your CDN. Angular hydration relies on HTML produced by the server, including whitespaces and comment nodes.");
   }
 }
-function provideGlobalEventDelegation() {
+function provideGlobalEventDelegation(multiContract = false) {
   return [{
     provide: IS_GLOBAL_EVENT_DELEGATION_ENABLED,
     useValue: true
@@ -26401,29 +26586,18 @@ function provideGlobalEventDelegation() {
     useValue: () => {
       const injector = inject(Injector);
       const eventContractDetails = injector.get(JSACTION_EVENT_CONTRACT);
+      if (multiContract && window.__jsaction_contract) {
+        eventContractDetails.instance = window.__jsaction_contract;
+        return;
+      }
       initGlobalEventDelegation(eventContractDetails, injector);
+      window.__jsaction_contract = eventContractDetails.instance;
     },
     multi: true
   }, {
     provide: GLOBAL_EVENT_DELEGATION,
     useClass: GlobalEventDelegation
   }];
-}
-function queueStateUpdate(callback, options) {
-  !options && assertInInjectionContext(queueStateUpdate);
-  const injector = options?.injector ?? inject(Injector);
-  const appRef = injector.get(ApplicationRef);
-  let executed = false;
-  const runCallbackOnce = () => {
-    if (executed || appRef.destroyed) return;
-    executed = true;
-    callback();
-  };
-  internalAfterNextRender(runCallbackOnce, {
-    injector,
-    runOnServer: true
-  });
-  queueMicrotask(runCallbackOnce);
 }
 function booleanAttribute(value) {
   return typeof value === "boolean" ? value : value != null && value !== "false";
@@ -26534,14 +26708,15 @@ var APP_EFFECT_SCHEDULER = new InjectionToken("", {
   providedIn: "root",
   factory: () => inject(EffectScheduler)
 });
-var _EffectScheduler = class _EffectScheduler {
+var EffectScheduler = class _EffectScheduler {
+  static {
+    this.ɵprov = ɵɵdefineInjectable({
+      token: _EffectScheduler,
+      providedIn: "root",
+      factory: () => new ZoneAwareEffectScheduler()
+    });
+  }
 };
-_EffectScheduler.ɵprov = ɵɵdefineInjectable({
-  token: _EffectScheduler,
-  providedIn: "root",
-  factory: () => new ZoneAwareEffectScheduler()
-});
-var EffectScheduler = _EffectScheduler;
 var ZoneAwareEffectScheduler = class {
   constructor() {
     this.queuedEffectCount = 0;
@@ -26783,16 +26958,19 @@ export {
   Injector,
   HostAttributeToken,
   HOST_TAG_NAME,
-  ErrorHandler,
   DestroyRef,
+  PendingTasks,
+  ExperimentalPendingTasks,
+  EventEmitter,
+  NgZone,
+  NoopNgZone,
+  ErrorHandler,
+  INTERNAL_APPLICATION_ERROR_HANDLER,
   OutputEmitterRef,
   getOutputDestroyRef,
   output,
   input,
   ElementRef,
-  PendingTasks,
-  ExperimentalPendingTasks,
-  EventEmitter,
   QueryList,
   LContext,
   getLContext,
@@ -26855,15 +27033,6 @@ export {
   RendererFactory2,
   Renderer2,
   Sanitizer,
-  assertNotInReactiveContext,
-  performanceMarkFeature,
-  NgZone,
-  NoopNgZone,
-  AfterRenderPhase,
-  internalAfterNextRender,
-  afterRender,
-  afterNextRender,
-  AfterRenderEventManager,
   isNgModule,
   USE_RUNTIME_DEPS_TRACKER_FOR_JIT,
   depsTracker,
@@ -26871,6 +27040,7 @@ export {
   ComponentRef,
   LifecycleHooksFeature,
   ViewContainerRef,
+  performanceMarkFeature,
   isSignal,
   ɵunwrapWritableSignal,
   signal,
@@ -26906,6 +27076,11 @@ export {
   ɵɵtemplate,
   DeferBlockState,
   DeferBlockBehavior,
+  assertNotInReactiveContext,
+  AfterRenderPhase,
+  AfterRenderManager,
+  afterRender,
+  afterNextRender,
   DEFER_BLOCK_DEPENDENCY_INTERCEPTOR,
   DEFER_BLOCK_CONFIG,
   ɵɵdeferEnableTimerScheduling,
@@ -27155,7 +27330,6 @@ export {
   withDomHydration,
   withI18nSupport,
   provideGlobalEventDelegation,
-  queueStateUpdate,
   booleanAttribute,
   numberAttribute,
   ɵɵngDeclareDirective,
@@ -27179,21 +27353,21 @@ export {
 
 @angular/core/fesm2022/primitives/signals.mjs:
   (**
-   * @license Angular v18.1.2
+   * @license Angular v18.2.6
    * (c) 2010-2024 Google LLC. https://angular.io/
    * License: MIT
    *)
 
 @angular/core/fesm2022/primitives/event-dispatch.mjs:
   (**
-   * @license Angular v18.1.2
+   * @license Angular v18.2.6
    * (c) 2010-2024 Google LLC. https://angular.io/
    * License: MIT
    *)
 
 @angular/core/fesm2022/core.mjs:
   (**
-   * @license Angular v18.1.2
+   * @license Angular v18.2.6
    * (c) 2010-2024 Google LLC. https://angular.io/
    * License: MIT
    *)
@@ -27204,7 +27378,7 @@ export {
    * Copyright Google LLC All Rights Reserved.
    *
    * Use of this source code is governed by an MIT-style license that can be
-   * found in the LICENSE file at https://angular.io/license
+   * found in the LICENSE file at https://angular.dev/license
    *)
 
 @angular/core/fesm2022/core.mjs:
@@ -27213,7 +27387,7 @@ export {
    * Copyright Google LLC All Rights Reserved.
    *
    * Use of this source code is governed by an MIT-style license that can be
-   * found in the LICENSE file at https://angular.io/license
+   * found in the LICENSE file at https://angular.dev/license
    *)
 
 @angular/core/fesm2022/core.mjs:
@@ -27222,7 +27396,7 @@ export {
    * Copyright Google LLC All Rights Reserved.
    *
    * Use of this source code is governed by an MIT-style license that can be
-   * found in the LICENSE file at https://angular.io/license
+   * found in the LICENSE file at https://angular.dev/license
    *)
 */
-//# sourceMappingURL=chunk-74SHBESK.js.map
+//# sourceMappingURL=chunk-X7WBHT7Z.js.map

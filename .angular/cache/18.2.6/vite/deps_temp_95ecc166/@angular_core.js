@@ -4,7 +4,7 @@ import {
   APP_BOOTSTRAP_LISTENER,
   APP_ID,
   APP_INITIALIZER,
-  AfterRenderEventManager,
+  AfterRenderManager,
   AfterRenderPhase,
   ApplicationInitStatus,
   ApplicationModule,
@@ -60,6 +60,7 @@ import {
   IMAGE_CONFIG_DEFAULTS,
   INJECTOR$1,
   INJECTOR_SCOPE,
+  INTERNAL_APPLICATION_ERROR_HANDLER,
   IS_HYDRATION_DOM_REUSE_ENABLED,
   Inject,
   InjectFlags,
@@ -204,7 +205,6 @@ import {
   inject,
   injectChangeDetectorRef,
   input,
-  internalAfterNextRender,
   internalCreateApplication,
   internalProvideZoneChangeDetection,
   isBoundToModule,
@@ -231,7 +231,6 @@ import {
   provideExperimentalZonelessChangeDetection,
   provideGlobalEventDelegation,
   provideZoneChangeDetection,
-  queueStateUpdate,
   readHydrationInfo,
   reflectComponentType,
   registerLocaleData,
@@ -462,8 +461,8 @@ import {
   ɵɵtwoWayProperty,
   ɵɵvalidateIframeAttribute,
   ɵɵviewQuery,
-  ɵɵviewQuerySignal,
-} from './chunk-74SHBESK.js'
+  ɵɵviewQuerySignal
+} from "./chunk-X7WBHT7Z.js";
 export {
   ANIMATION_MODULE_TYPE,
   APP_BOOTSTRAP_LISTENER,
@@ -606,7 +605,7 @@ export {
   viewChild,
   viewChildren,
   ALLOW_MULTIPLE_PLATFORMS as ɵALLOW_MULTIPLE_PLATFORMS,
-  AfterRenderEventManager as ɵAfterRenderEventManager,
+  AfterRenderManager as ɵAfterRenderManager,
   CONTAINER_HEADER_OFFSET as ɵCONTAINER_HEADER_OFFSET,
   ChangeDetectionScheduler as ɵChangeDetectionScheduler,
   ChangeDetectionSchedulerImpl as ɵChangeDetectionSchedulerImpl,
@@ -623,6 +622,7 @@ export {
   IMAGE_CONFIG_DEFAULTS as ɵIMAGE_CONFIG_DEFAULTS,
   INJECTOR_SCOPE as ɵINJECTOR_SCOPE,
   ɵINPUT_SIGNAL_BRAND_WRITE_TYPE,
+  INTERNAL_APPLICATION_ERROR_HANDLER as ɵINTERNAL_APPLICATION_ERROR_HANDLER,
   IS_HYDRATION_DOM_REUSE_ENABLED as ɵIS_HYDRATION_DOM_REUSE_ENABLED,
   JSACTION_EVENT_CONTRACT as ɵJSACTION_EVENT_CONTRACT,
   LContext as ɵLContext,
@@ -695,7 +695,6 @@ export {
   ɵgetUnknownPropertyStrictMode,
   _global as ɵglobal,
   injectChangeDetectorRef as ɵinjectChangeDetectorRef,
-  internalAfterNextRender as ɵinternalAfterNextRender,
   internalCreateApplication as ɵinternalCreateApplication,
   internalProvideZoneChangeDetection as ɵinternalProvideZoneChangeDetection,
   isBoundToModule as ɵisBoundToModule,
@@ -709,7 +708,6 @@ export {
   patchComponentDefWithScope as ɵpatchComponentDefWithScope,
   performanceMarkFeature as ɵperformanceMarkFeature,
   provideGlobalEventDelegation as ɵprovideGlobalEventDelegation,
-  queueStateUpdate as ɵqueueStateUpdate,
   readHydrationInfo as ɵreadHydrationInfo,
   registerLocaleData as ɵregisterLocaleData,
   renderDeferBlockState as ɵrenderDeferBlockState,
@@ -930,6 +928,6 @@ export {
   ɵɵtwoWayProperty,
   ɵɵvalidateIframeAttribute,
   ɵɵviewQuery,
-  ɵɵviewQuerySignal,
-}
+  ɵɵviewQuerySignal
+};
 //# sourceMappingURL=@angular_core.js.map
