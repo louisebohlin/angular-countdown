@@ -1,0 +1,33 @@
+h1 {
+  color: var(--primary-color);
+  font-weight: 800;
+}
+
+h2 {
+  font-weight: 400;
+}
+
+.countdown-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.countdown-header {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  padding-top: 2rem;
+  gap: 1rem;
+  width: 100%;
+
+  h1,
+  h2 {
+    font-size: calc(100vw / 12.5);
+  }
+
+  @media (max-width: 600px) {
+    padding-top: 8rem;
+    gap: 1.5rem;
+  }
+}
