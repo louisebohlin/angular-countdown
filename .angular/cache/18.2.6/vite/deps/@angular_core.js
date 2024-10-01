@@ -461,8 +461,8 @@ import {
   ɵɵtwoWayProperty,
   ɵɵvalidateIframeAttribute,
   ɵɵviewQuery,
-  ɵɵviewQuerySignal,
-} from './chunk-X7WBHT7Z.js'
+  ɵɵviewQuerySignal
+} from "./chunk-X7WBHT7Z.js";
 export {
   ANIMATION_MODULE_TYPE,
   APP_BOOTSTRAP_LISTENER,
@@ -928,6 +928,6 @@ export {
   ɵɵtwoWayProperty,
   ɵɵvalidateIframeAttribute,
   ɵɵviewQuery,
-  ɵɵviewQuerySignal,
-}
+  ɵɵviewQuerySignal
+};
 //# sourceMappingURL=@angular_core.js.map
